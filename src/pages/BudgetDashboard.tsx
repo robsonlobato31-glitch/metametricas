@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -76,8 +75,7 @@ const BudgetDashboard = () => {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -299,7 +297,6 @@ const BudgetDashboard = () => {
           </>
         )}
       </div>
-    </DashboardLayout>
   );
 };
 
