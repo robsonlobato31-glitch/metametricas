@@ -304,6 +304,54 @@ export type Database = {
           },
         ]
       }
+      plan_configurations: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number | null
+          features: Json
+          hotmart_url: string | null
+          id: string
+          is_active: boolean | null
+          is_highlighted: boolean | null
+          name: string
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          price_amount: number
+          price_display: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          features?: Json
+          hotmart_url?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_highlighted?: boolean | null
+          name: string
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          price_amount: number
+          price_display: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          features?: Json
+          hotmart_url?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_highlighted?: boolean | null
+          name?: string
+          plan_type?: Database["public"]["Enums"]["plan_type"]
+          price_amount?: number
+          price_display?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       report_templates: {
         Row: {
           created_at: string
