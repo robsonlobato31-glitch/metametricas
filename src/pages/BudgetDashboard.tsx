@@ -8,18 +8,48 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { TrendingUp, AlertTriangle, DollarSign } from 'lucide-react';
 import { useCampaignBudgetHistory } from '@/hooks/useCampaignBudgetHistory';
 import { Badge } from '@/components/ui/badge';
+import { ExportReportButton } from '@/components/reports/ExportReportButton';
+import { useExportReport } from '@/hooks/useExportReport';
 
 const BudgetDashboard = () => {
   const [timeRange, setTimeRange] = useState('30');
   const { aggregatedData, campaignCumulativeData, isLoading } = useCampaignBudgetHistory(
     parseInt(timeRange)
   );
+  const { exportReport, isExporting } = useExportReport();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
+  };
+
+  const handleExport = async () => {
+    const totalSpend = aggregatedData.reduce((sum, day) => sum + day.spend, 0);
+    const totalBudget = aggregatedData.reduce((sum, day) => sum + day.budget, 0);
+
+    await exportReport({
+      title: 'Relatório de Orçamento de Campanhas',
+      period: `Últimos ${timeRange} dias`,
+      metrics: [
+        { label: 'Gasto Total', value: formatCurrency(totalSpend) },
+        { label: 'Orçamento Total', value: formatCurrency(totalBudget) },
+        { label: 'Campanhas', value: `${campaignCumulativeData.length}` },
+        { label: 'Utilização', value: `${((totalSpend / totalBudget) * 100).toFixed(1)}%` },
+      ],
+      campaigns: campaignCumulativeData.map((c) => ({
+        name: c.name,
+        provider: 'Meta/Google',
+        status: c.percentage >= 100 ? 'Excedido' : c.percentage >= 90 ? 'Crítico' : 'Normal',
+        spend: formatCurrency(c.currentSpend),
+        budget: formatCurrency(c.budget),
+      })),
+      chartIds: {
+        budgetChart: 'budget-chart',
+        trendChart: 'trend-chart',
+      },
+    });
   };
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -56,18 +86,24 @@ const BudgetDashboard = () => {
               Acompanhe a evolução de gastos vs orçamento das suas campanhas
             </p>
           </div>
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Selecione o período" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Últimos 7 dias</SelectItem>
-              <SelectItem value="15">Últimos 15 dias</SelectItem>
-              <SelectItem value="30">Últimos 30 dias</SelectItem>
-              <SelectItem value="60">Últimos 60 dias</SelectItem>
-              <SelectItem value="90">Últimos 90 dias</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-3">
+            <ExportReportButton 
+              onClick={handleExport} 
+              isLoading={isExporting}
+            />
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Selecione o período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Últimos 7 dias</SelectItem>
+                <SelectItem value="15">Últimos 15 dias</SelectItem>
+                <SelectItem value="30">Últimos 30 dias</SelectItem>
+                <SelectItem value="60">Últimos 60 dias</SelectItem>
+                <SelectItem value="90">Últimos 90 dias</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {isLoading ? (
@@ -105,7 +141,7 @@ const BudgetDashboard = () => {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={aggregatedData}>
+                  <BarChart data={aggregatedData} id="budget-chart">
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis 
                       dataKey="displayDate" 
@@ -213,7 +249,7 @@ const BudgetDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={400}>
-                    <LineChart>
+                    <LineChart id="trend-chart">
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis 
                         dataKey="displayDate" 

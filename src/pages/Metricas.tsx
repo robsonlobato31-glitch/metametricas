@@ -4,9 +4,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DollarSign, MousePointerClick, Users, Target, ShoppingCart, Eye } from 'lucide-react';
 import { useMetrics } from '@/hooks/useMetrics';
+import { ExportReportButton } from '@/components/reports/ExportReportButton';
+import { useExportReport } from '@/hooks/useExportReport';
 
 export default function Metricas() {
   const { totals, metaMetrics, googleMetrics, isLoading } = useMetrics();
+  const { exportReport, isExporting } = useExportReport();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -19,14 +22,39 @@ export default function Metricas() {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
 
+  const handleExport = async () => {
+    if (!totals) return;
+
+    await exportReport({
+      title: 'Relatório de Métricas',
+      period: 'Últimos 30 dias',
+      metrics: [
+        { label: 'Total Gasto', value: formatCurrency(totals.spend) },
+        { label: 'Impressões', value: formatNumber(totals.impressions) },
+        { label: 'Cliques', value: formatNumber(totals.clicks) },
+        { label: 'Conversões', value: formatNumber(totals.conversions) },
+        { label: 'CTR Médio', value: `${totals.ctr.toFixed(2)}%` },
+        { label: 'CPC Médio', value: formatCurrency(totals.cpc) },
+      ],
+      campaigns: [],
+    });
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Métricas</h1>
-          <p className="text-muted-foreground mt-1">
-            Análise detalhada de performance das suas campanhas
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Métricas</h1>
+            <p className="text-muted-foreground mt-1">
+              Análise detalhada de performance das suas campanhas
+            </p>
+          </div>
+          <ExportReportButton 
+            onClick={handleExport} 
+            isLoading={isExporting}
+            label="Exportar Métricas"
+          />
         </div>
 
         {/* Overview Cards */}
