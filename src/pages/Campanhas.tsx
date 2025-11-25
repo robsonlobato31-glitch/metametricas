@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select';
 import { useCampaigns } from '@/hooks/useCampaigns';
 import { Search, Facebook, Chrome } from 'lucide-react';
+import { ExportReportButton } from '@/components/reports/ExportReportButton';
+import { useExportReport } from '@/hooks/useExportReport';
 
 export default function Campanhas() {
   const [search, setSearch] = useState('');
@@ -32,6 +34,8 @@ export default function Campanhas() {
     status: status === 'all' ? undefined : status,
     search,
   });
+
+  const { exportReport, isExporting } = useExportReport();
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { variant: any; label: string }> = {
@@ -52,14 +56,48 @@ export default function Campanhas() {
     }).format(value);
   };
 
+  const handleExport = async () => {
+    if (!campaigns || campaigns.length === 0) return;
+
+    const totalBudget = campaigns.reduce(
+      (sum, c) => sum + (c.daily_budget || c.lifetime_budget || 0),
+      0
+    );
+
+    await exportReport({
+      title: 'Relatório de Campanhas',
+      period: 'Todas as campanhas',
+      metrics: [
+        { label: 'Total de Campanhas', value: `${campaigns.length}` },
+        { label: 'Ativas', value: `${campaigns.filter(c => c.status === 'ACTIVE').length}` },
+        { label: 'Pausadas', value: `${campaigns.filter(c => c.status === 'PAUSED').length}` },
+        { label: 'Orçamento Total', value: formatCurrency(totalBudget) },
+      ],
+      campaigns: campaigns.map((c) => ({
+        name: c.name,
+        provider: c.ad_accounts.provider === 'meta' ? 'Meta Ads' : 'Google Ads',
+        status: c.status === 'ACTIVE' ? 'Ativa' : c.status === 'PAUSED' ? 'Pausada' : 'Deletada',
+        spend: '-',
+        budget: formatCurrency(c.daily_budget || c.lifetime_budget),
+      })),
+    });
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Campanhas</h1>
-          <p className="text-muted-foreground mt-1">
-            Visualize e gerencie todas as suas campanhas
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Campanhas</h1>
+            <p className="text-muted-foreground mt-1">
+              Visualize e gerencie todas as suas campanhas
+            </p>
+          </div>
+          <ExportReportButton 
+            onClick={handleExport} 
+            isLoading={isExporting}
+            label="Exportar Campanhas"
+          />
         </div>
 
         {/* Filters */}
