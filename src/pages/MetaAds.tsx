@@ -19,6 +19,7 @@ export default function MetaAds() {
 
   const metaIntegration = integrations?.find(i => i.provider === 'meta');
   const isConnected = metaIntegration?.status === 'active';
+  const isExpired = metaIntegration?.status === 'expired';
 
   const handleConnect = async () => {
     if (!accessToken.trim()) {
@@ -32,11 +33,16 @@ export default function MetaAds() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // Meta long-lived tokens expire after 60 days
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 60);
+
       // Criar/atualizar integração
       const { error } = await supabase.from('integrations').upsert({
         user_id: user.id,
         provider: 'meta',
         access_token: accessToken,
+        expires_at: expiresAt.toISOString(),
         status: 'active',
         integration_source: 'oauth_manual',
       }, {
@@ -89,9 +95,19 @@ export default function MetaAds() {
 
       refetchAccounts();
     } catch (error: any) {
-      toast.error('Erro ao sincronizar', {
-        description: error.message,
-      });
+      const errorMessage = error.message || 'Erro desconhecido';
+      
+      // Check if it's a token expiration error
+      if (errorMessage.includes('expired') || errorMessage.includes('Session has expired')) {
+        toast.error('Token expirado', {
+          description: 'Seu token de acesso expirou. Por favor, reconecte sua conta Meta Ads.',
+        });
+        refetchIntegrations();
+      } else {
+        toast.error('Erro ao sincronizar', {
+          description: errorMessage,
+        });
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -119,6 +135,11 @@ export default function MetaAds() {
                   <CheckCircle className="h-3 w-3" />
                   Conectado
                 </Badge>
+              ) : isExpired ? (
+                <Badge variant="destructive" className="gap-1">
+                  <XCircle className="h-3 w-3" />
+                  Token Expirado
+                </Badge>
               ) : (
                 <Badge variant="secondary" className="gap-1">
                   <XCircle className="h-3 w-3" />
@@ -129,18 +150,22 @@ export default function MetaAds() {
             <CardDescription>
               {isConnected
                 ? 'Sua conta Meta Ads está conectada e funcionando'
+                : isExpired
+                ? 'Seu token de acesso expirou. Reconecte para continuar sincronizando'
                 : 'Conecte sua conta para começar a importar dados'}
             </CardDescription>
           </CardHeader>
         </Card>
 
         {/* Connect Card */}
-        {!isConnected && (
+        {(!isConnected || isExpired) && (
           <Card>
             <CardHeader>
-              <CardTitle>Conectar Meta Ads</CardTitle>
+              <CardTitle>{isExpired ? 'Reconectar' : 'Conectar'} Meta Ads</CardTitle>
               <CardDescription>
-                Cole o token de acesso gerado no Meta Business Manager
+                {isExpired 
+                  ? 'Seu token expirou. Gere um novo token no Meta Business Manager e conecte novamente'
+                  : 'Cole o token de acesso gerado no Meta Business Manager'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
