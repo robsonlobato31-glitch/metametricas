@@ -161,6 +161,33 @@ export type Database = {
           },
         ]
       }
+      dashboard_layouts: {
+        Row: {
+          created_at: string | null
+          id: string
+          layout: Json
+          updated_at: string | null
+          user_id: string
+          widgets: Json
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          layout?: Json
+          updated_at?: string | null
+          user_id: string
+          widgets?: Json
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          layout?: Json
+          updated_at?: string | null
+          user_id?: string
+          widgets?: Json
+        }
+        Relationships: []
+      }
       integrations: {
         Row: {
           access_token: string | null
@@ -401,6 +428,42 @@ export type Database = {
           provider?: string
           sync_type?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_onboarding: {
+        Row: {
+          completed_at: string | null
+          completed_steps: string[] | null
+          created_at: string | null
+          current_step: number | null
+          id: string
+          started_at: string | null
+          tour_completed: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_steps?: string[] | null
+          created_at?: string | null
+          current_step?: number | null
+          id?: string
+          started_at?: string | null
+          tour_completed?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_steps?: string[] | null
+          created_at?: string | null
+          current_step?: number | null
+          id?: string
+          started_at?: string | null
+          tour_completed?: boolean | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
