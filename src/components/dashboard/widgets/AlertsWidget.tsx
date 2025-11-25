@@ -5,6 +5,7 @@ import { useCampaignAlerts } from '@/hooks/useCampaignAlerts';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { SyncMetricsButton } from '@/components/SyncMetricsButton';
 
 export const AlertsWidget = () => {
   const { alerts, isLoading } = useCampaignAlerts();
@@ -36,6 +37,7 @@ export const AlertsWidget = () => {
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
             <AlertTriangle className="h-8 w-8 text-muted-foreground/50" />
             <p>Nenhum alerta ativo</p>
+            <p className="text-xs">Sincronize as métricas para ver alertas</p>
           </div>
         ) : (
           <div className="space-y-3">

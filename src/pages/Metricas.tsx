@@ -6,6 +6,7 @@ import { DollarSign, MousePointerClick, Users, Target, ShoppingCart, Eye } from 
 import { useMetrics } from '@/hooks/useMetrics';
 import { ExportReportButton } from '@/components/reports/ExportReportButton';
 import { useExportReport } from '@/hooks/useExportReport';
+import { SyncMetricsButton } from '@/components/SyncMetricsButton';
 
 export default function Metricas() {
   const { totals, metaMetrics, googleMetrics, isLoading } = useMetrics();
@@ -50,11 +51,14 @@ export default function Metricas() {
               Análise detalhada de performance das suas campanhas
             </p>
           </div>
-          <ExportReportButton 
-            onClick={handleExport} 
-            isLoading={isExporting}
-            label="Exportar Métricas"
-          />
+          <div className="flex gap-2">
+            <SyncMetricsButton />
+            <ExportReportButton 
+              onClick={handleExport} 
+              isLoading={isExporting}
+              label="Exportar Métricas"
+            />
+          </div>
         </div>
 
         {/* Overview Cards */}
@@ -75,8 +79,11 @@ export default function Metricas() {
           </div>
         ) : !totals || totals.spend === 0 ? (
           <Alert>
-            <AlertDescription>
-              Nenhuma métrica disponível. Configure suas integrações e sincronize os dados para visualizar as métricas.
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                Nenhuma métrica disponível. Clique em "Sincronizar Métricas" para carregar os dados das suas campanhas.
+              </span>
+              <SyncMetricsButton />
             </AlertDescription>
           </Alert>
         ) : (

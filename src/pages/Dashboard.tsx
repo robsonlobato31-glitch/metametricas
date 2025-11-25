@@ -7,6 +7,7 @@ import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { OnboardingChecklist } from '@/components/onboarding/OnboardingChecklist';
 import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
 import { WidgetSelector } from '@/components/dashboard/WidgetSelector';
+import { SyncMetricsButton } from '@/components/SyncMetricsButton';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 import { Layout as GridLayout } from 'react-grid-layout';
@@ -91,6 +92,7 @@ export default function Dashboard() {
               </>
             ) : (
               <>
+                <SyncMetricsButton />
                 <Button 
                   variant="outline" 
                   onClick={handleResetLayout}

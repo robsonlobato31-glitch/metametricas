@@ -1,30 +1,44 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, FileText, Settings, Bell } from 'lucide-react';
+import { RefreshCw, FileText, Settings, Bell, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useMetrics } from '@/hooks/useMetrics';
+import { useSyncMetrics } from '@/hooks/useSyncMetrics';
 import { useToast } from '@/hooks/use-toast';
 
 export const QuickActionsWidget = () => {
   const navigate = useNavigate();
-  const { refetch, isLoading } = useMetrics();
+  const { refetch, isLoading: metricsLoading } = useMetrics();
+  const { syncMeta, syncGoogle, isLoading: syncLoading } = useSyncMetrics();
   const { toast } = useToast();
 
   const handleRefresh = async () => {
     await refetch();
     toast({
       title: 'Dados Atualizados',
-      description: 'As métricas foram sincronizadas com sucesso.',
+      description: 'As métricas foram recarregadas com sucesso.',
     });
+  };
+
+  const handleSyncMetrics = () => {
+    syncMeta();
+    syncGoogle();
   };
 
   const actions = [
     {
+      label: 'Sincronizar Métricas',
+      icon: Database,
+      onClick: handleSyncMetrics,
+      loading: syncLoading,
+      variant: 'default' as const,
+    },
+    {
       label: 'Atualizar Dados',
       icon: RefreshCw,
       onClick: handleRefresh,
-      loading: isLoading,
-      variant: 'default' as const,
+      loading: metricsLoading,
+      variant: 'outline' as const,
     },
     {
       label: 'Gerar Relatório',
