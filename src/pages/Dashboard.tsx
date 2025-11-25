@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Edit3, Plus, RotateCcw, Save } from 'lucide-react';
+import { Edit3, Plus, RotateCcw, Save, Settings2 } from 'lucide-react';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { OnboardingChecklist } from '@/components/onboarding/OnboardingChecklist';
 import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
@@ -11,6 +11,20 @@ import { useOnboarding } from '@/hooks/useOnboarding';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 import { Layout as GridLayout } from 'react-grid-layout';
 import { DashboardWidget } from '@/types/dashboard';
+import { ColumnCustomizer } from '@/components/filters/ColumnCustomizer';
+
+const AVAILABLE_WIDGETS = [
+  { id: 'metric-spend', label: 'Gasto Total', required: false },
+  { id: 'metric-impressions', label: 'Impressões', required: false },
+  { id: 'metric-clicks', label: 'Cliques', required: false },
+  { id: 'metric-conversions', label: 'Conversões', required: false },
+  { id: 'metric-results', label: 'Resultados', required: false },
+  { id: 'metric-messages', label: 'Mensagens', required: false },
+  { id: 'chart-performance', label: 'Gráfico de Performance', required: false },
+  { id: 'alerts', label: 'Alertas', required: false },
+  { id: 'campaigns', label: 'Lista de Campanhas', required: false },
+  { id: 'quick-actions', label: 'Ações Rápidas', required: false },
+];
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -21,6 +35,9 @@ export default function Dashboard() {
   const [runTour, setRunTour] = useState(false);
   const [showWidgetSelector, setShowWidgetSelector] = useState(false);
   const [currentLayouts, setCurrentLayouts] = useState(layout.layouts);
+  const [visibleWidgets, setVisibleWidgets] = useState<string[]>(
+    layout.widgets.map((w) => w.type)
+  );
 
   const handleStartTour = () => {
     setRunTour(true);
@@ -91,6 +108,11 @@ export default function Dashboard() {
             ) : (
               <>
                 <SyncMetricsButton />
+                <ColumnCustomizer
+                  pageName="dashboard"
+                  availableColumns={AVAILABLE_WIDGETS}
+                  onColumnsChange={setVisibleWidgets}
+                />
                 <Button 
                   variant="outline" 
                   onClick={handleResetLayout}
@@ -107,7 +129,7 @@ export default function Dashboard() {
                   <Plus className="h-4 w-4 mr-2" />
                   Adicionar Widget
                 </Button>
-                <Button 
+                <Button
                   onClick={() => setIsEditMode(true)}
                   size="sm"
                 >

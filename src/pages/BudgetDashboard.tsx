@@ -13,6 +13,16 @@ import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { subDays, differenceInDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ColumnCustomizer } from '@/components/filters/ColumnCustomizer';
+import { AdAccountFilter } from '@/components/filters/AdAccountFilter';
+
+const AVAILABLE_COLUMNS = [
+  { id: 'campaign_name', label: 'Campanha', required: true },
+  { id: 'budget', label: 'Orçamento', required: true },
+  { id: 'spend', label: 'Gasto', required: true },
+  { id: 'percentage', label: 'Utilização %', required: false },
+  { id: 'status', label: 'Status', required: false },
+];
 
 const BudgetDashboard = () => {
   const [timeRange, setTimeRange] = useState('30');
@@ -21,6 +31,10 @@ const BudgetDashboard = () => {
     to: new Date(),
   });
   const [useCustomRange, setUseCustomRange] = useState(false);
+  const [accountId, setAccountId] = useState<string | undefined>(undefined);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    AVAILABLE_COLUMNS.map((col) => col.id)
+  );
 
   // Calculate days based on custom range or preset
   const calculatedDays = useCustomRange && dateRange?.from && dateRange?.to
@@ -97,20 +111,25 @@ const BudgetDashboard = () => {
 
   return (
     <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Dashboard de Orçamento</h1>
-            <p className="text-muted-foreground mt-1">
-              Acompanhe a evolução de gastos vs orçamento das suas campanhas
-            </p>
-          </div>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard de Orçamento</h1>
+          <p className="text-muted-foreground mt-1">
+            Acompanhe a evolução de gastos vs orçamento das suas campanhas
+          </p>
+        </div>
         <div className="flex items-center gap-3">
+          <ColumnCustomizer
+            pageName="budget_dashboard"
+            availableColumns={AVAILABLE_COLUMNS}
+            onColumnsChange={setVisibleColumns}
+          />
           <ExportReportButton 
             onClick={handleExport} 
             isLoading={isExporting}
           />
-          <Select 
+          <Select
             value={useCustomRange ? 'custom' : timeRange} 
             onValueChange={(value) => {
               if (value === 'custom') {
@@ -142,15 +161,19 @@ const BudgetDashboard = () => {
           <CardHeader>
             <CardTitle>Período Personalizado</CardTitle>
             <CardDescription>
-              Selecione o intervalo de datas para análise
+              Selecione o intervalo de datas e conta para análise
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <DateRangePicker
               dateRange={dateRange}
               onDateRangeChange={setDateRange}
               placeholder="Selecione o período"
               className="max-w-sm"
+            />
+            <AdAccountFilter
+              value={accountId}
+              onChange={setAccountId}
             />
           </CardContent>
         </Card>
