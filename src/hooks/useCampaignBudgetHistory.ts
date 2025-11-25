@@ -14,16 +14,20 @@ type CampaignWithMetrics = {
   }[];
 };
 
-export const useCampaignBudgetHistory = (days: number = 30) => {
+export const useCampaignBudgetHistory = (
+  days: number = 30,
+  fromDate?: Date,
+  toDate?: Date
+) => {
   const { user } = useAuth();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['campaign-budget-history', user?.id, days],
+    queryKey: ['campaign-budget-history', user?.id, days, fromDate, toDate],
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const dateFrom = subDays(new Date(), days);
-      const dateTo = new Date();
+      const dateFrom = fromDate || subDays(new Date(), days);
+      const dateTo = toDate || new Date();
 
       // Get all user's campaigns with budgets
       const { data: campaigns, error: campaignsError } = await supabase
@@ -88,8 +92,8 @@ export const useCampaignBudgetHistory = (days: number = 30) => {
   const aggregatedData = () => {
     if (!data || data.length === 0) return [];
 
-    const dateFrom = subDays(new Date(), days);
-    const dateTo = new Date();
+    const dateFrom = fromDate || subDays(new Date(), days);
+    const dateTo = toDate || new Date();
     const allDates = eachDayOfInterval({ start: dateFrom, end: dateTo });
 
     return allDates.map((date) => {

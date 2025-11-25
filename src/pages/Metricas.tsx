@@ -6,9 +6,22 @@ import { useMetrics } from '@/hooks/useMetrics';
 import { ExportReportButton } from '@/components/reports/ExportReportButton';
 import { useExportReport } from '@/hooks/useExportReport';
 import { SyncMetricsButton } from '@/components/SyncMetricsButton';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { useState } from 'react';
+import { DateRange } from 'react-day-picker';
+import { subDays, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export default function Metricas() {
-  const { totals, metaMetrics, googleMetrics, isLoading } = useMetrics();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
+
+  const { totals, metaMetrics, googleMetrics, isLoading } = useMetrics(
+    dateRange?.from,
+    dateRange?.to
+  );
   const { exportReport, isExporting } = useExportReport();
 
   const formatCurrency = (value: number) => {
@@ -25,9 +38,13 @@ export default function Metricas() {
   const handleExport = async () => {
     if (!totals) return;
 
+    const periodText = dateRange?.from && dateRange?.to
+      ? `${format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR })} - ${format(dateRange.to, 'dd/MM/yyyy', { locale: ptBR })}`
+      : 'Últimos 30 dias';
+
     await exportReport({
       title: 'Relatório de Métricas',
-      period: 'Últimos 30 dias',
+      period: periodText,
       metrics: [
         { label: 'Total Gasto', value: formatCurrency(totals.spend) },
         { label: 'Impressões', value: formatNumber(totals.impressions) },
@@ -42,22 +59,40 @@ export default function Metricas() {
 
   return (
     <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Métricas</h1>
-            <p className="text-muted-foreground mt-1">
-              Análise detalhada de performance das suas campanhas
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <SyncMetricsButton />
-            <ExportReportButton 
-              onClick={handleExport} 
-              isLoading={isExporting}
-              label="Exportar Métricas"
-            />
-          </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Métricas</h1>
+          <p className="text-muted-foreground mt-1">
+            Análise detalhada de performance das suas campanhas
+          </p>
         </div>
+        <div className="flex gap-2 flex-wrap">
+          <SyncMetricsButton />
+          <ExportReportButton 
+            onClick={handleExport} 
+            isLoading={isExporting}
+            label="Exportar Métricas"
+          />
+        </div>
+      </div>
+
+      {/* Date Range Filter */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtro de Período</CardTitle>
+          <CardDescription>
+            Selecione o período para visualizar as métricas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DateRangePicker
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            placeholder="Selecione o período"
+            className="max-w-sm"
+          />
+        </CardContent>
+      </Card>
 
         {/* Overview Cards */}
         {isLoading ? (
@@ -93,7 +128,11 @@ export default function Metricas() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatCurrency(totals.spend)}</div>
-                <p className="text-xs text-muted-foreground mt-1">Últimos 30 dias</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {dateRange?.from && dateRange?.to
+                    ? `${format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR })} - ${format(dateRange.to, 'dd/MM/yyyy', { locale: ptBR })}`
+                    : 'Últimos 30 dias'}
+                </p>
               </CardContent>
             </Card>
 
