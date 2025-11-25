@@ -395,6 +395,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_user_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      get_all_users: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          last_sign_in_at: string
+          plan_expires_at: string
+          plan_max_accounts: number
+          plan_status: Database["public"]["Enums"]["plan_status"]
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          roles: Database["public"]["Enums"]["app_role"][]
+        }[]
+      }
       get_detailed_metrics: {
         Args: { p_date_from: string; p_date_to: string; p_user_id: string }
         Returns: {
@@ -433,6 +454,23 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      remove_user_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      update_user_plan: {
+        Args: {
+          p_expires_at?: string
+          p_max_accounts: number
+          p_plan_type: Database["public"]["Enums"]["plan_type"]
+          p_status: Database["public"]["Enums"]["plan_status"]
+          p_user_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

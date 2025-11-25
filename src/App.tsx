@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/AdminRoute";
+import { DashboardLayout } from "@/components/DashboardLayout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -17,6 +19,7 @@ import MetaAds from "./pages/MetaAds";
 import GoogleAds from "./pages/GoogleAds";
 import AlertaGasto from "./pages/AlertaGasto";
 import Settings from "./pages/Settings";
+import AdminUsers from "./pages/AdminUsers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,7 +44,9 @@ const App = () => (
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <DashboardLayout>
+                      <Dashboard />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -49,7 +54,9 @@ const App = () => (
                 path="/campanhas"
                 element={
                   <ProtectedRoute>
-                    <Campanhas />
+                    <DashboardLayout>
+                      <Campanhas />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -57,7 +64,9 @@ const App = () => (
                 path="/metricas"
                 element={
                   <ProtectedRoute>
-                    <Metricas />
+                    <DashboardLayout>
+                      <Metricas />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -65,7 +74,9 @@ const App = () => (
                 path="/meta-ads"
                 element={
                   <ProtectedRoute>
-                    <MetaAds />
+                    <DashboardLayout>
+                      <MetaAds />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -73,7 +84,9 @@ const App = () => (
                 path="/google-ads"
                 element={
                   <ProtectedRoute>
-                    <GoogleAds />
+                    <DashboardLayout>
+                      <GoogleAds />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -81,7 +94,9 @@ const App = () => (
                 path="/alerta-gasto"
                 element={
                   <ProtectedRoute>
-                    <AlertaGasto />
+                    <DashboardLayout>
+                      <AlertaGasto />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -89,8 +104,20 @@ const App = () => (
                 path="/settings"
                 element={
                   <ProtectedRoute>
-                    <Settings />
+                    <DashboardLayout>
+                      <Settings />
+                    </DashboardLayout>
                   </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <AdminRoute>
+                    <DashboardLayout>
+                      <AdminUsers />
+                    </DashboardLayout>
+                  </AdminRoute>
                 }
               />
 
