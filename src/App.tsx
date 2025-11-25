@@ -22,6 +22,10 @@ import AlertaGasto from "./pages/AlertaGasto";
 import BudgetDashboard from "./pages/BudgetDashboard";
 import Settings from "./pages/Settings";
 import AdminUsers from "./pages/AdminUsers";
+import Plans from "./pages/Plans";
+import Workspaces from "./pages/Workspaces";
+import WorkspaceMembers from "./pages/WorkspaceMembers";
+import WorkspaceSettings from "./pages/WorkspaceSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -131,6 +135,46 @@ const App = () => (
                       <AdminUsers />
                     </DashboardLayout>
                   </AdminRoute>
+                }
+              />
+              <Route
+                path="/plans"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <Plans />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/workspaces"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <Workspaces />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/workspaces/:workspaceId/members"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <WorkspaceMembers />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/workspaces/:workspaceId/settings"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <WorkspaceSettings />
+                    </DashboardLayout>
+                  </ProtectedRoute>
                 }
               />
 

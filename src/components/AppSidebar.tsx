@@ -7,7 +7,9 @@ import {
   Bell, 
   Settings, 
   Users,
-  LogOut
+  LogOut,
+  Building2,
+  CreditCard
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -44,6 +46,8 @@ const integrationItems = [
 const settingsItems = [
   { title: 'Alertas', url: '/alerta-gasto', icon: Bell },
   { title: 'Dashboard Orçamento', url: '/budget-dashboard', icon: BarChart3 },
+  { title: 'Workspaces', url: '/workspaces', icon: Building2 },
+  { title: 'Planos', url: '/plans', icon: CreditCard },
   { title: 'Configurações', url: '/settings', icon: Settings },
 ];
 

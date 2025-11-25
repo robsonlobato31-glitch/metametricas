@@ -477,6 +477,9 @@ export type Database = {
           plan_type: Database["public"]["Enums"]["plan_type"]
           started_at: string
           status: Database["public"]["Enums"]["plan_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          trial_ends_at: string | null
           updated_at: string
           user_id: string
         }
@@ -488,6 +491,9 @@ export type Database = {
           plan_type?: Database["public"]["Enums"]["plan_type"]
           started_at?: string
           status?: Database["public"]["Enums"]["plan_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -499,6 +505,9 @@ export type Database = {
           plan_type?: Database["public"]["Enums"]["plan_type"]
           started_at?: string
           status?: Database["public"]["Enums"]["plan_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -525,6 +534,156 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      workspace_branding: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          custom_domain: string | null
+          id: string
+          logo_url: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          custom_domain?: string | null
+          id?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          custom_domain?: string | null
+          id?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_branding_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          status: Database["public"]["Enums"]["invite_status"]
+          workspace_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          status?: Database["public"]["Enums"]["invite_status"]
+          workspace_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          status?: Database["public"]["Enums"]["invite_status"]
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_invites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_members: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_members_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspaces: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -615,8 +774,10 @@ export type Database = {
       app_role: "user" | "admin" | "super_admin"
       integration_provider: "meta" | "google"
       integration_status: "active" | "expired" | "error" | "disconnected"
+      invite_status: "pending" | "accepted" | "declined" | "expired"
       plan_status: "active" | "expired" | "cancelled" | "suspended"
       plan_type: "survival" | "professional" | "agency" | "enterprise"
+      workspace_role: "owner" | "admin" | "editor" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -747,8 +908,10 @@ export const Constants = {
       app_role: ["user", "admin", "super_admin"],
       integration_provider: ["meta", "google"],
       integration_status: ["active", "expired", "error", "disconnected"],
+      invite_status: ["pending", "accepted", "declined", "expired"],
       plan_status: ["active", "expired", "cancelled", "suspended"],
       plan_type: ["survival", "professional", "agency", "enterprise"],
+      workspace_role: ["owner", "admin", "editor", "viewer"],
     },
   },
 } as const

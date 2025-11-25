@@ -12,11 +12,26 @@ export const usePlan = () => {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const { data, error } = await supabase
+      const { data: planData, error: planError } = await supabase
         .rpc('get_user_plan', { p_user_id: user.id });
 
-      if (error) throw error;
-      return data?.[0] || null;
+      if (planError) throw planError;
+
+      // Buscar trial_ends_at separadamente
+      const { data: planDetails, error: detailsError } = await supabase
+        .from('user_plans')
+        .select('trial_ends_at, stripe_customer_id, stripe_subscription_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (detailsError) throw detailsError;
+
+      return planData?.[0] ? {
+        ...planData[0],
+        trial_ends_at: planDetails?.trial_ends_at || null,
+        stripe_customer_id: planDetails?.stripe_customer_id || null,
+        stripe_subscription_id: planDetails?.stripe_subscription_id || null,
+      } : null;
     },
     enabled: !!user?.id,
   });
@@ -31,6 +46,9 @@ export const usePlan = () => {
       is_at_limit: false,
       expires_at: null,
       status: 'active' as const,
+      trial_ends_at: null,
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
       isLoading: false,
       error: null,
     };
