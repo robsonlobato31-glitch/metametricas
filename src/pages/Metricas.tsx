@@ -78,11 +78,32 @@ export default function Metricas() {
         )
     : null;
 
+  // Calculate averages for breakdown aggregates
+  const displayTotals = breakdownAggregates 
+    ? {
+        ...breakdownAggregates,
+        avgCtr: breakdownAggregates.impressions > 0 
+          ? (breakdownAggregates.clicks / breakdownAggregates.impressions) * 100 
+          : 0,
+        avgCpc: breakdownAggregates.clicks > 0 
+          ? breakdownAggregates.spend / breakdownAggregates.clicks 
+          : 0,
+        avgCostPerResult: breakdownAggregates.results > 0 
+          ? breakdownAggregates.spend / breakdownAggregates.results 
+          : 0,
+        avgCostPerMessage: breakdownAggregates.messages > 0 
+          ? breakdownAggregates.spend / breakdownAggregates.messages 
+          : 0,
+      }
+    : totals;
+
   const handleExport = async () => {
-    const displayTotals = breakdownAggregates || totals;
     const period = dateRange?.from && dateRange?.to
       ? `${dateRange.from.toLocaleDateString('pt-BR')} - ${dateRange.to.toLocaleDateString('pt-BR')}`
       : 'Últimos 30 dias';
+
+    const avgCtr = 'avgCtr' in displayTotals ? displayTotals.avgCtr : 0;
+    const avgCpc = 'avgCpc' in displayTotals ? displayTotals.avgCpc : 0;
 
     await exportReport({
       title: 'Relatório de Métricas',
@@ -91,8 +112,10 @@ export default function Metricas() {
         { label: 'Gasto Total', value: formatCurrency(displayTotals.spend) },
         { label: 'Impressões', value: formatNumber(displayTotals.impressions) },
         { label: 'Cliques', value: formatNumber(displayTotals.clicks) },
-        { label: 'CTR Médio', value: `${displayTotals.avgCtr?.toFixed(2) || 0}%` },
+        { label: 'CTR Médio', value: `${(avgCtr || 0).toFixed(2)}%` },
+        { label: 'CPC Médio', value: formatCurrency(avgCpc || 0) },
       ],
+      campaigns: [],
     });
   };
 
@@ -161,38 +184,37 @@ export default function Metricas() {
             if (!column) return null;
 
             let value = '';
-            const displayData = breakdownAggregates || totals;
 
             switch (colId) {
               case 'spend':
-                value = formatCurrency(displayData.spend);
+                value = formatCurrency(displayTotals.spend);
                 break;
               case 'impressions':
-                value = formatNumber(displayData.impressions);
+                value = formatNumber(displayTotals.impressions);
                 break;
               case 'clicks':
-                value = formatNumber(displayData.clicks);
+                value = formatNumber(displayTotals.clicks);
                 break;
               case 'conversions':
-                value = formatNumber(displayData.conversions);
+                value = formatNumber(displayTotals.conversions);
                 break;
               case 'ctr':
-                value = `${totals.avgCtr?.toFixed(2) || 0}%`;
+                value = `${('avgCtr' in displayTotals ? displayTotals.avgCtr : 0).toFixed(2)}%`;
                 break;
               case 'cpc':
-                value = formatCurrency(totals.avgCpc || 0);
+                value = formatCurrency('avgCpc' in displayTotals ? displayTotals.avgCpc : 0);
                 break;
               case 'results':
-                value = formatNumber(displayData.results || 0);
+                value = formatNumber(displayTotals.results || 0);
                 break;
               case 'cost_per_result':
-                value = formatCurrency(totals.avgCostPerResult || 0);
+                value = formatCurrency('avgCostPerResult' in displayTotals ? displayTotals.avgCostPerResult : 0);
                 break;
               case 'messages':
-                value = formatNumber(displayData.messages || 0);
+                value = formatNumber(displayTotals.messages || 0);
                 break;
               case 'cost_per_message':
-                value = formatCurrency(totals.avgCostPerMessage || 0);
+                value = formatCurrency('avgCostPerMessage' in displayTotals ? displayTotals.avgCostPerMessage : 0);
                 break;
             }
 
