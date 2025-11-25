@@ -47,6 +47,27 @@ const AVAILABLE_WIDGETS = [
     category: 'Métricas',
   },
   {
+    type: 'metric-results' as WidgetType,
+    title: 'Resultados',
+    description: 'Total de ações do objetivo',
+    icon: TrendingUp,
+    category: 'Métricas',
+  },
+  {
+    type: 'metric-messages' as WidgetType,
+    title: 'Mensagens',
+    description: 'Total de conversas iniciadas',
+    icon: TrendingUp,
+    category: 'Métricas',
+  },
+  {
+    type: 'metric-cost-per-result' as WidgetType,
+    title: 'Custo por Resultado',
+    description: 'Custo médio por resultado',
+    icon: DollarSign,
+    category: 'Métricas',
+  },
+  {
     type: 'chart-performance' as WidgetType,
     title: 'Gráfico de Performance',
     description: 'Visualize a performance ao longo do tempo',

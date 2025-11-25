@@ -18,8 +18,12 @@ type MetricsData = {
   total_video_views_50: number;
   total_video_views_75: number;
   total_video_views_100: number;
+  total_results: number;
+  total_messages: number;
   avg_ctr: number;
   avg_cpc: number;
+  avg_cost_per_result: number;
+  avg_cost_per_message: number;
 };
 
 export const useMetrics = (dateFrom?: Date, dateTo?: Date) => {
@@ -75,6 +79,8 @@ export const useMetrics = (dateFrom?: Date, dateTo?: Date) => {
       video_views_50: acc.video_views_50 + Number(curr.total_video_views_50 || 0),
       video_views_75: acc.video_views_75 + Number(curr.total_video_views_75 || 0),
       video_views_100: acc.video_views_100 + Number(curr.total_video_views_100 || 0),
+      results: acc.results + Number(curr.total_results || 0),
+      messages: acc.messages + Number(curr.total_messages || 0),
     }),
     {
       impressions: 0,
@@ -89,16 +95,26 @@ export const useMetrics = (dateFrom?: Date, dateTo?: Date) => {
       video_views_50: 0,
       video_views_75: 0,
       video_views_100: 0,
+      results: 0,
+      messages: 0,
     }
   );
 
-  // Calculate average CTR and CPC
+  // Calculate averages
   const avgCtr = data?.length
     ? data.reduce((sum, curr) => sum + Number(curr.avg_ctr || 0), 0) / data.length
     : 0;
 
   const avgCpc = data?.length
     ? data.reduce((sum, curr) => sum + Number(curr.avg_cpc || 0), 0) / data.length
+    : 0;
+
+  const avgCostPerResult = data?.length
+    ? data.reduce((sum, curr) => sum + Number(curr.avg_cost_per_result || 0), 0) / data.length
+    : 0;
+
+  const avgCostPerMessage = data?.length
+    ? data.reduce((sum, curr) => sum + Number(curr.avg_cost_per_message || 0), 0) / data.length
     : 0;
 
   // Get metrics by provider
@@ -112,6 +128,8 @@ export const useMetrics = (dateFrom?: Date, dateTo?: Date) => {
           ...totals,
           ctr: avgCtr,
           cpc: avgCpc,
+          cost_per_result: avgCostPerResult,
+          cost_per_message: avgCostPerMessage,
         }
       : null,
     metaMetrics: metaMetrics
@@ -124,8 +142,12 @@ export const useMetrics = (dateFrom?: Date, dateTo?: Date) => {
           page_views: Number(metaMetrics.total_page_views || 0),
           initiated_checkout: Number(metaMetrics.total_initiated_checkout || 0),
           purchases: Number(metaMetrics.total_purchases || 0),
+          results: Number(metaMetrics.total_results || 0),
+          messages: Number(metaMetrics.total_messages || 0),
           ctr: Number(metaMetrics.avg_ctr || 0),
           cpc: Number(metaMetrics.avg_cpc || 0),
+          cost_per_result: Number(metaMetrics.avg_cost_per_result || 0),
+          cost_per_message: Number(metaMetrics.avg_cost_per_message || 0),
         }
       : null,
     googleMetrics: googleMetrics
@@ -138,8 +160,12 @@ export const useMetrics = (dateFrom?: Date, dateTo?: Date) => {
           page_views: Number(googleMetrics.total_page_views || 0),
           initiated_checkout: Number(googleMetrics.total_initiated_checkout || 0),
           purchases: Number(googleMetrics.total_purchases || 0),
+          results: Number(googleMetrics.total_results || 0),
+          messages: Number(googleMetrics.total_messages || 0),
           ctr: Number(googleMetrics.avg_ctr || 0),
           cpc: Number(googleMetrics.avg_cpc || 0),
+          cost_per_result: Number(googleMetrics.avg_cost_per_result || 0),
+          cost_per_message: Number(googleMetrics.avg_cost_per_message || 0),
         }
       : null,
     isLoading,

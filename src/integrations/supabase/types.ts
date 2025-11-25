@@ -235,6 +235,8 @@ export type Database = {
           campaign_id: string
           clicks: number | null
           conversions: number | null
+          cost_per_message: number | null
+          cost_per_result: number | null
           cpc: number | null
           created_at: string
           ctr: number | null
@@ -243,8 +245,10 @@ export type Database = {
           impressions: number | null
           initiated_checkout: number | null
           link_clicks: number | null
+          messages: number | null
           page_views: number | null
           purchases: number | null
+          results: number | null
           spend: number | null
           updated_at: string
           video_views_100: number | null
@@ -256,6 +260,8 @@ export type Database = {
           campaign_id: string
           clicks?: number | null
           conversions?: number | null
+          cost_per_message?: number | null
+          cost_per_result?: number | null
           cpc?: number | null
           created_at?: string
           ctr?: number | null
@@ -264,8 +270,10 @@ export type Database = {
           impressions?: number | null
           initiated_checkout?: number | null
           link_clicks?: number | null
+          messages?: number | null
           page_views?: number | null
           purchases?: number | null
+          results?: number | null
           spend?: number | null
           updated_at?: string
           video_views_100?: number | null
@@ -277,6 +285,8 @@ export type Database = {
           campaign_id?: string
           clicks?: number | null
           conversions?: number | null
+          cost_per_message?: number | null
+          cost_per_result?: number | null
           cpc?: number | null
           created_at?: string
           ctr?: number | null
@@ -285,8 +295,10 @@ export type Database = {
           impressions?: number | null
           initiated_checkout?: number | null
           link_clicks?: number | null
+          messages?: number | null
           page_views?: number | null
           purchases?: number | null
+          results?: number | null
           spend?: number | null
           updated_at?: string
           video_views_100?: number | null
@@ -764,6 +776,8 @@ export type Database = {
       get_detailed_metrics: {
         Args: { p_date_from: string; p_date_to: string; p_user_id: string }
         Returns: {
+          avg_cost_per_message: number
+          avg_cost_per_result: number
           avg_cpc: number
           avg_ctr: number
           provider: string
@@ -772,8 +786,10 @@ export type Database = {
           total_impressions: number
           total_initiated_checkout: number
           total_link_clicks: number
+          total_messages: number
           total_page_views: number
           total_purchases: number
+          total_results: number
           total_spend: number
           total_video_views_100: number
           total_video_views_25: number
