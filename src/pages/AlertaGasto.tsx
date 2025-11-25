@@ -8,6 +8,7 @@ import { Bell, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCampaignAlerts } from '@/hooks/useCampaignAlerts';
 import { useRealtimeAlertsContext } from '@/contexts/RealtimeAlertsContext';
+import { BudgetMonitorButton } from '@/components/BudgetMonitorButton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -53,10 +54,13 @@ export default function AlertaGasto() {
               Monitore campanhas que estão próximas ou ultrapassaram o orçamento
             </p>
           </div>
-          <Button onClick={() => refetch()} variant="outline" disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Atualizar
-          </Button>
+          <div className="flex gap-2">
+            <BudgetMonitorButton />
+            <Button onClick={() => refetch()} variant="outline" disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+          </div>
         </div>
 
         {/* Info Alert */}
