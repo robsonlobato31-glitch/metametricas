@@ -77,7 +77,7 @@ export default function Metricas() {
               </Card>
             ))}
           </div>
-        ) : !totals || totals.spend === 0 ? (
+        ) : !totals ? (
           <Alert>
             <AlertDescription className="flex items-center justify-between">
               <span>
@@ -190,7 +190,7 @@ export default function Metricas() {
         )}
 
         {/* Platform Comparison */}
-        {!isLoading && totals && totals.spend > 0 && (
+        {!isLoading && totals && (
           <div className="grid gap-4 md:grid-cols-2">
             {metaMetrics && (
               <Card>

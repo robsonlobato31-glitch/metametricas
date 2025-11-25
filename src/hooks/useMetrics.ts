@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { subDays, format } from 'date-fns';
+import { useMemo } from 'react';
 
 type MetricsData = {
   provider: string;
@@ -24,21 +25,36 @@ type MetricsData = {
 export const useMetrics = (dateFrom?: Date, dateTo?: Date) => {
   const { user } = useAuth();
 
-  const defaultDateFrom = dateFrom || subDays(new Date(), 30);
-  const defaultDateTo = dateTo || new Date();
+  // Estabilizar datas como strings para evitar recriação do queryKey
+  const dateFromStr = useMemo(() => 
+    format(dateFrom || subDays(new Date(), 30), 'yyyy-MM-dd'), 
+    [dateFrom]
+  );
+  
+  const dateToStr = useMemo(() => 
+    format(dateTo || new Date(), 'yyyy-MM-dd'), 
+    [dateTo]
+  );
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['metrics', user?.id, defaultDateFrom, defaultDateTo],
+    queryKey: ['metrics', user?.id, dateFromStr, dateToStr],
     queryFn: async () => {
       if (!user?.id) return [];
 
+      console.log('[useMetrics] Fetching metrics:', { user_id: user.id, dateFromStr, dateToStr });
+
       const { data, error } = await supabase.rpc('get_detailed_metrics', {
         p_user_id: user.id,
-        p_date_from: format(defaultDateFrom, 'yyyy-MM-dd'),
-        p_date_to: format(defaultDateTo, 'yyyy-MM-dd'),
+        p_date_from: dateFromStr,
+        p_date_to: dateToStr,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useMetrics] Error fetching metrics:', error);
+        throw error;
+      }
+
+      console.log('[useMetrics] Metrics fetched successfully:', data);
       return (data || []) as MetricsData[];
     },
     enabled: !!user?.id,
