@@ -43,6 +43,7 @@ const integrationItems = [
 
 const settingsItems = [
   { title: 'Alertas', url: '/alerta-gasto', icon: Bell },
+  { title: 'Dashboard Orçamento', url: '/budget-dashboard', icon: BarChart3 },
   { title: 'Configurações', url: '/settings', icon: Settings },
 ];
 
