@@ -7,6 +7,8 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { usePlan } from '@/hooks/usePlan';
 import { User, Shield, CreditCard, LogOut } from 'lucide-react';
 import { ReportTemplateSettings } from '@/components/settings/ReportTemplateSettings';
+import { SyncScheduleSettings } from '@/components/settings/SyncScheduleSettings';
+import { SyncTester } from '@/components/settings/SyncTester';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -118,6 +120,12 @@ export default function Settings() {
 
         {/* Report Template Settings */}
         <ReportTemplateSettings />
+
+        {/* Sync Schedule Settings */}
+        <SyncScheduleSettings />
+
+        {/* Sync Tester */}
+        <SyncTester />
 
         {/* Actions Card */}
         <Card>
