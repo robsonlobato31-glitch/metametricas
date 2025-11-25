@@ -4,13 +4,18 @@ import { RefreshCw, FileText, Settings, Bell, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useMetrics } from '@/hooks/useMetrics';
 import { useSyncMetrics } from '@/hooks/useSyncMetrics';
+import { useIntegrations } from '@/hooks/useIntegrations';
 import { useToast } from '@/hooks/use-toast';
 
 export const QuickActionsWidget = () => {
   const navigate = useNavigate();
   const { refetch, isLoading: metricsLoading } = useMetrics();
   const { syncMeta, syncGoogle, isLoading: syncLoading } = useSyncMetrics();
+  const { data: integrations } = useIntegrations();
   const { toast } = useToast();
+
+  const hasMeta = integrations?.some(i => i.provider === 'meta' && i.status === 'active');
+  const hasGoogle = integrations?.some(i => i.provider === 'google' && i.status === 'active');
 
   const handleRefresh = async () => {
     await refetch();
@@ -21,8 +26,12 @@ export const QuickActionsWidget = () => {
   };
 
   const handleSyncMetrics = () => {
-    syncMeta();
-    syncGoogle();
+    if (hasMeta) {
+      syncMeta();
+    }
+    if (hasGoogle) {
+      syncGoogle();
+    }
   };
 
   const actions = [
