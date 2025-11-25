@@ -91,6 +91,7 @@ export function AppSidebar() {
                       end
                       className="hover:bg-muted/50"
                       activeClassName="bg-muted text-primary font-medium"
+                      data-tour={item.title === 'Campanhas' ? 'campaigns' : undefined}
                     >
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
@@ -103,7 +104,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Integrações */}
-        <SidebarGroup>
+        <SidebarGroup data-tour="integrations">
           <SidebarGroupLabel>Integrações</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -139,6 +140,11 @@ export function AppSidebar() {
                       end
                       className="hover:bg-muted/50"
                       activeClassName="bg-muted text-primary font-medium"
+                      data-tour={
+                        item.title === 'Alertas' ? 'alerts' :
+                        item.title === 'Configurações' ? 'settings' :
+                        undefined
+                      }
                     >
                       <div className="flex items-center gap-2 flex-1">
                         <item.icon className="h-4 w-4" />
