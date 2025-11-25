@@ -19,6 +19,7 @@ import Metricas from "./pages/Metricas";
 import MetaAds from "./pages/MetaAds";
 import GoogleAds from "./pages/GoogleAds";
 import AlertaGasto from "./pages/AlertaGasto";
+import BudgetDashboard from "./pages/BudgetDashboard";
 import Settings from "./pages/Settings";
 import AdminUsers from "./pages/AdminUsers";
 import NotFound from "./pages/NotFound";
@@ -98,6 +99,16 @@ const App = () => (
                   <ProtectedRoute>
                     <DashboardLayout>
                       <AlertaGasto />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/budget-dashboard"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <BudgetDashboard />
                     </DashboardLayout>
                   </ProtectedRoute>
                 }
