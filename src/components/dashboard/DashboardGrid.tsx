@@ -6,6 +6,9 @@ import { ChartWidget } from './widgets/ChartWidget';
 import { CampaignListWidget } from './widgets/CampaignListWidget';
 import { AlertsWidget } from './widgets/AlertsWidget';
 import { QuickActionsWidget } from './widgets/QuickActionsWidget';
+import { ResultsWidget } from './widgets/ResultsWidget';
+import { MessagesWidget } from './widgets/MessagesWidget';
+import { CostPerResultWidget } from './widgets/CostPerResultWidget';
 import { useMetrics } from '@/hooks/useMetrics';
 import { DollarSign, Users, MousePointerClick, TrendingUp } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -102,6 +105,12 @@ export const DashboardGrid = ({
               isLoading={isLoading}
             />
           );
+        case 'metric-results':
+          return <ResultsWidget />;
+        case 'metric-messages':
+          return <MessagesWidget />;
+        case 'metric-cost-per-result':
+          return <CostPerResultWidget />;
         case 'chart-performance':
           return <ChartWidget title="Performance Semanal" data={chartData} isLoading={isLoading} />;
         case 'campaign-list':

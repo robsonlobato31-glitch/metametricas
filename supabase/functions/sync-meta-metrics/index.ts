@@ -77,7 +77,7 @@ serve(async (req) => {
         
         const insightsResponse = await fetch(
           `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?` +
-          `fields=date_start,impressions,clicks,spend,actions,action_values,ctr,cpc&` +
+          `fields=date_start,impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr,cpc&` +
           `time_range={"since":"${date30DaysAgo.toISOString().split('T')[0]}","until":"${new Date().toISOString().split('T')[0]}"}&` +
           `time_increment=1&` +
           `access_token=${accessToken}`
@@ -89,6 +89,7 @@ serve(async (req) => {
           if (insights && insights.length > 0) {
             for (const insight of insights) {
               const actions = insight.actions || [];
+              const costPerActionType = insight.cost_per_action_type || [];
               
               const conversions = actions.find((a: any) => 
                 a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
@@ -98,6 +99,38 @@ serve(async (req) => {
               const linkClicks = actions.find((a: any) => a.action_type === 'link_click')?.value || 0;
               const pageViews = actions.find((a: any) => a.action_type === 'landing_page_view')?.value || 0;
               const initiatedCheckout = actions.find((a: any) => a.action_type === 'initiate_checkout')?.value || 0;
+              
+              // Extract results - general conversions based on campaign objective
+              const results = actions.find((a: any) => 
+                a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+                a.action_type === 'lead' ||
+                a.action_type === 'purchase' ||
+                a.action_type === 'omni_purchase' ||
+                a.action_type === 'link_click' ||
+                a.action_type === 'landing_page_view'
+              )?.value || 0;
+              
+              // Extract messages
+              const messages = actions.find((a: any) => 
+                a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+                a.action_type === 'onsite_conversion.messaging_first_reply'
+              )?.value || 0;
+              
+              // Extract cost per result
+              const costPerResult = costPerActionType.find((c: any) =>
+                c.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+                c.action_type === 'lead' ||
+                c.action_type === 'purchase' ||
+                c.action_type === 'omni_purchase' ||
+                c.action_type === 'link_click' ||
+                c.action_type === 'landing_page_view'
+              )?.value || 0;
+              
+              // Extract cost per message
+              const costPerMessage = costPerActionType.find((c: any) =>
+                c.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+                c.action_type === 'onsite_conversion.messaging_first_reply'
+              )?.value || 0;
 
               const { error: upsertError } = await supabaseClient.from('metrics').upsert({
                 campaign_id: campaign.id,
@@ -112,6 +145,10 @@ serve(async (req) => {
                 page_views: parseInt(pageViews) || 0,
                 initiated_checkout: parseInt(initiatedCheckout) || 0,
                 purchases: parseInt(conversions) || 0,
+                results: parseInt(results) || 0,
+                messages: parseInt(messages) || 0,
+                cost_per_result: parseFloat(costPerResult) || 0,
+                cost_per_message: parseFloat(costPerMessage) || 0,
               }, {
                 onConflict: 'campaign_id,date',
               });

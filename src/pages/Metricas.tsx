@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { DollarSign, MousePointerClick, Users, Target, ShoppingCart, Eye } from 'lucide-react';
+import { DollarSign, MousePointerClick, Users, Target, ShoppingCart, Eye, MessageSquare } from 'lucide-react';
 import { useMetrics } from '@/hooks/useMetrics';
 import { ExportReportButton } from '@/components/reports/ExportReportButton';
 import { useExportReport } from '@/hooks/useExportReport';
@@ -210,6 +210,50 @@ export default function Metricas() {
               <CardContent>
                 <div className="text-2xl font-bold">{formatNumber(totals.page_views)}</div>
                 <p className="text-xs text-muted-foreground mt-1">Total de page views</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Resultados</CardTitle>
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatNumber(totals.results)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Total de ações do objetivo</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Custo por Resultado</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(totals.cost_per_result)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Por ação do objetivo</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Mensagens</CardTitle>
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatNumber(totals.messages)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Total de conversas</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Custo por Mensagem</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(totals.cost_per_message)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Por mensagem iniciada</p>
               </CardContent>
             </Card>
 
