@@ -13,6 +13,7 @@ import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useRealtimeAlertsContext } from '@/contexts/RealtimeAlertsContext';
 import {
   Sidebar,
   SidebarContent,
@@ -50,6 +51,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { isSuperAdmin, isAdmin } = useUserRole();
+  const { newAlertsCount } = useRealtimeAlertsContext();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
@@ -137,8 +139,15 @@ export function AppSidebar() {
                       className="hover:bg-muted/50"
                       activeClassName="bg-muted text-primary font-medium"
                     >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <div className="flex items-center gap-2 flex-1">
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </div>
+                      {item.url === '/alerta-gasto' && newAlertsCount > 0 && !collapsed && (
+                        <span className="ml-auto bg-destructive text-destructive-foreground text-xs font-semibold px-2 py-0.5 rounded-full">
+                          {newAlertsCount}
+                        </span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
