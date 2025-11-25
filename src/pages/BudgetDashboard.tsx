@@ -9,11 +9,28 @@ import { useCampaignBudgetHistory } from '@/hooks/useCampaignBudgetHistory';
 import { Badge } from '@/components/ui/badge';
 import { ExportReportButton } from '@/components/reports/ExportReportButton';
 import { useExportReport } from '@/hooks/useExportReport';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { DateRange } from 'react-day-picker';
+import { subDays, differenceInDays, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const BudgetDashboard = () => {
   const [timeRange, setTimeRange] = useState('30');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
+  const [useCustomRange, setUseCustomRange] = useState(false);
+
+  // Calculate days based on custom range or preset
+  const calculatedDays = useCustomRange && dateRange?.from && dateRange?.to
+    ? differenceInDays(dateRange.to, dateRange.from) + 1
+    : parseInt(timeRange);
+
   const { aggregatedData, campaignCumulativeData, isLoading } = useCampaignBudgetHistory(
-    parseInt(timeRange)
+    calculatedDays,
+    useCustomRange && dateRange?.from ? dateRange.from : undefined,
+    useCustomRange && dateRange?.to ? dateRange.to : undefined
   );
   const { exportReport, isExporting } = useExportReport();
 
@@ -25,12 +42,16 @@ const BudgetDashboard = () => {
   };
 
   const handleExport = async () => {
-    const totalSpend = aggregatedData.reduce((sum, day) => sum + day.spend, 0);
     const totalBudget = aggregatedData.reduce((sum, day) => sum + day.budget, 0);
+    const totalSpend = aggregatedData.reduce((sum, day) => sum + day.spend, 0);
+
+    const periodText = useCustomRange && dateRange?.from && dateRange?.to
+      ? `${format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR })} - ${format(dateRange.to, 'dd/MM/yyyy', { locale: ptBR })}`
+      : `Últimos ${timeRange} dias`;
 
     await exportReport({
       title: 'Relatório de Orçamento de Campanhas',
-      period: `Últimos ${timeRange} dias`,
+      period: periodText,
       metrics: [
         { label: 'Gasto Total', value: formatCurrency(totalSpend) },
         { label: 'Orçamento Total', value: formatCurrency(totalBudget) },
@@ -84,25 +105,56 @@ const BudgetDashboard = () => {
               Acompanhe a evolução de gastos vs orçamento das suas campanhas
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <ExportReportButton 
-              onClick={handleExport} 
-              isLoading={isExporting}
-            />
-            <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Selecione o período" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Últimos 7 dias</SelectItem>
-                <SelectItem value="15">Últimos 15 dias</SelectItem>
-                <SelectItem value="30">Últimos 30 dias</SelectItem>
-                <SelectItem value="60">Últimos 60 dias</SelectItem>
-                <SelectItem value="90">Últimos 90 dias</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex items-center gap-3">
+          <ExportReportButton 
+            onClick={handleExport} 
+            isLoading={isExporting}
+          />
+          <Select 
+            value={useCustomRange ? 'custom' : timeRange} 
+            onValueChange={(value) => {
+              if (value === 'custom') {
+                setUseCustomRange(true);
+              } else {
+                setUseCustomRange(false);
+                setTimeRange(value);
+              }
+            }}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Selecione o período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Últimos 7 dias</SelectItem>
+              <SelectItem value="15">Últimos 15 dias</SelectItem>
+              <SelectItem value="30">Últimos 30 dias</SelectItem>
+              <SelectItem value="60">Últimos 60 dias</SelectItem>
+              <SelectItem value="90">Últimos 90 dias</SelectItem>
+              <SelectItem value="custom">Período personalizado</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+      </div>
+
+      {/* Custom Date Range Filter */}
+      {useCustomRange && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Período Personalizado</CardTitle>
+            <CardDescription>
+              Selecione o intervalo de datas para análise
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+              placeholder="Selecione o período"
+              className="max-w-sm"
+            />
+          </CardContent>
+        </Card>
+      )}
 
         {isLoading ? (
           <div className="space-y-6">
