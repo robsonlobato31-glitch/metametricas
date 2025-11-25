@@ -230,6 +230,74 @@ export type Database = {
         }
         Relationships: []
       }
+      metric_breakdowns: {
+        Row: {
+          breakdown_type: string
+          breakdown_value: string
+          campaign_id: string
+          clicks: number | null
+          conversions: number | null
+          cost_per_message: number | null
+          cost_per_result: number | null
+          cpc: number | null
+          created_at: string | null
+          ctr: number | null
+          date: string
+          id: string
+          impressions: number | null
+          messages: number | null
+          results: number | null
+          spend: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          breakdown_type: string
+          breakdown_value: string
+          campaign_id: string
+          clicks?: number | null
+          conversions?: number | null
+          cost_per_message?: number | null
+          cost_per_result?: number | null
+          cpc?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date: string
+          id?: string
+          impressions?: number | null
+          messages?: number | null
+          results?: number | null
+          spend?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          breakdown_type?: string
+          breakdown_value?: string
+          campaign_id?: string
+          clicks?: number | null
+          conversions?: number | null
+          cost_per_message?: number | null
+          cost_per_result?: number | null
+          cpc?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string
+          id?: string
+          impressions?: number | null
+          messages?: number | null
+          results?: number | null
+          spend?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metric_breakdowns_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       metrics: {
         Row: {
           campaign_id: string
@@ -489,6 +557,36 @@ export type Database = {
           sync_type?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_column_preferences: {
+        Row: {
+          column_order: string[] | null
+          created_at: string | null
+          id: string
+          page_name: string
+          updated_at: string | null
+          user_id: string
+          visible_columns: string[]
+        }
+        Insert: {
+          column_order?: string[] | null
+          created_at?: string | null
+          id?: string
+          page_name: string
+          updated_at?: string | null
+          user_id: string
+          visible_columns?: string[]
+        }
+        Update: {
+          column_order?: string[] | null
+          created_at?: string | null
+          id?: string
+          page_name?: string
+          updated_at?: string | null
+          user_id?: string
+          visible_columns?: string[]
         }
         Relationships: []
       }
