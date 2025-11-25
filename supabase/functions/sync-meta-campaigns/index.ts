@@ -56,8 +56,20 @@ serve(async (req) => {
     );
 
     if (!meResponse.ok) {
-      const error = await meResponse.text();
-      throw new Error(`Erro ao buscar contas Meta: ${error}`);
+      const errorText = await meResponse.text();
+      
+      // Check if it's an expired token error
+      if (errorText.includes('Session has expired') || errorText.includes('OAuthException')) {
+        // Mark integration as expired
+        await supabaseClient
+          .from('integrations')
+          .update({ status: 'expired' })
+          .eq('id', integration.id);
+        
+        console.error(`[${logId}] Token Meta expirado, marcando integração como expirada`);
+      }
+      
+      throw new Error(`Erro ao buscar contas Meta: ${errorText}`);
     }
 
     const { data: adAccounts } = await meResponse.json();

@@ -126,6 +126,19 @@ serve(async (req) => {
           }
         } else {
           const errorText = await insightsResponse.text();
+          
+          // Check if it's an expired token error
+          if (errorText.includes('Session has expired') || errorText.includes('OAuthException')) {
+            // Mark integration as expired
+            await supabaseClient
+              .from('integrations')
+              .update({ status: 'expired' })
+              .eq('id', integration.id);
+            
+            console.error(`[${logId}] Token Meta expirado, marcando integração como expirada`);
+            throw new Error('Token de acesso expirado. Por favor, reconecte sua conta Meta Ads.');
+          }
+          
           console.error(`[${logId}] Erro ao buscar insights da campanha ${campaign.name}:`, errorText);
           errors++;
         }

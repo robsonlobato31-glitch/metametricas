@@ -34,8 +34,15 @@ export async function getValidAccessToken(
   const expiresAt = integration.expires_at ? new Date(integration.expires_at) : null;
   const fiveMinutes = 5 * 60 * 1000;
 
-  // Se não tem expires_at ou ainda não expirou, retorna token atual
-  if (!expiresAt || (expiresAt.getTime() - now.getTime()) > fiveMinutes) {
+  // Se não tem expires_at, assumir que pode estar expirado e tentar renovar
+  if (expiresAt && (expiresAt.getTime() - now.getTime()) > fiveMinutes) {
+    // Token ainda válido
+    return integration.access_token;
+  }
+
+  // Se expires_at é null ou está próximo de expirar, tentar renovar
+  if (!expiresAt) {
+    console.log(`Token sem data de expiração para integração ${integrationId}, tentando usar token atual...`);
     return integration.access_token;
   }
 
