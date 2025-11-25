@@ -16,6 +16,7 @@ export default function MetaAds() {
   const [accessToken, setAccessToken] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showEditToken, setShowEditToken] = useState(false);
 
   const metaIntegration = integrations?.find(i => i.provider === 'meta');
   const isConnected = metaIntegration?.status === 'active';
@@ -53,6 +54,7 @@ export default function MetaAds() {
 
       toast.success('Meta Ads conectado com sucesso!');
       setAccessToken('');
+      setShowEditToken(false);
       refetchIntegrations();
     } catch (error: any) {
       toast.error('Erro ao conectar', {
@@ -157,14 +159,18 @@ export default function MetaAds() {
           </CardHeader>
         </Card>
 
-        {/* Connect Card */}
-        {(!isConnected || isExpired) && (
+        {/* Connect/Edit Token Card */}
+        {(!isConnected || isExpired || showEditToken) && (
           <Card>
             <CardHeader>
-              <CardTitle>{isExpired ? 'Reconectar' : 'Conectar'} Meta Ads</CardTitle>
+              <CardTitle>
+                {isExpired ? 'Reconectar' : showEditToken ? 'Editar Token' : 'Conectar'} Meta Ads
+              </CardTitle>
               <CardDescription>
                 {isExpired 
                   ? 'Seu token expirou. Gere um novo token no Meta Business Manager e conecte novamente'
+                  : showEditToken
+                  ? 'Atualize seu token de acesso do Meta Ads'
                   : 'Cole o token de acesso gerado no Meta Business Manager'}
               </CardDescription>
             </CardHeader>
@@ -192,29 +198,53 @@ export default function MetaAds() {
                 </p>
               </div>
 
-              <Button onClick={handleConnect} disabled={isConnecting || !accessToken.trim()}>
-                {isConnecting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Conectando...
-                  </>
-                ) : (
-                  'Conectar Meta Ads'
+              <div className="flex gap-2">
+                <Button onClick={handleConnect} disabled={isConnecting || !accessToken.trim()}>
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Conectando...
+                    </>
+                  ) : (
+                    showEditToken ? 'Atualizar Token' : 'Conectar Meta Ads'
+                  )}
+                </Button>
+                {showEditToken && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowEditToken(false);
+                      setAccessToken('');
+                    }}
+                  >
+                    Cancelar
+                  </Button>
                 )}
-              </Button>
+              </div>
             </CardContent>
           </Card>
         )}
 
         {/* Sync and Accounts */}
-        {isConnected && (
+        {isConnected && !showEditToken && (
           <>
             <Card>
               <CardHeader>
-                <CardTitle>Sincronizar Dados</CardTitle>
-                <CardDescription>
-                  Importe campanhas e métricas do Meta Ads
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Sincronizar Dados</CardTitle>
+                    <CardDescription>
+                      Importe campanhas e métricas do Meta Ads
+                    </CardDescription>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowEditToken(true)}
+                  >
+                    Editar Token
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <Button onClick={handleSync} disabled={isSyncing}>
