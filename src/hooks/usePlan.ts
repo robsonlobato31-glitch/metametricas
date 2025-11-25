@@ -5,9 +5,9 @@ import { useUserRole } from './useUserRole';
 
 export const usePlan = () => {
   const { user } = useAuth();
-  const { isSuperAdmin } = useUserRole();
+  const { isSuperAdmin, isLoading: rolesLoading } = useUserRole();
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading: planLoading, error } = useQuery({
     queryKey: ['user-plan', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -33,11 +33,13 @@ export const usePlan = () => {
         stripe_subscription_id: planDetails?.stripe_subscription_id || null,
       } : null;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !rolesLoading,
   });
 
+  const isLoading = rolesLoading || planLoading;
+
   // Super Admin bypassa todos os limites
-  if (isSuperAdmin) {
+  if (isSuperAdmin && !rolesLoading) {
     return {
       plan_type: 'enterprise' as const,
       max_accounts: Infinity,
@@ -55,7 +57,16 @@ export const usePlan = () => {
   }
 
   return {
-    ...data,
+    plan_type: data?.plan_type || 'survival',
+    max_accounts: data?.max_accounts || 2,
+    accounts_used: data?.accounts_used || 0,
+    can_add_account: data?.can_add_account || false,
+    is_at_limit: data?.is_at_limit || false,
+    expires_at: data?.expires_at,
+    status: data?.status || 'active',
+    trial_ends_at: data?.trial_ends_at,
+    stripe_customer_id: data?.stripe_customer_id,
+    stripe_subscription_id: data?.stripe_subscription_id,
     isLoading,
     error,
   };

@@ -78,7 +78,7 @@ export default function Settings() {
             </div>
             {isSuperAdmin && (
               <p className="text-sm text-muted-foreground mt-2">
-                Você tem acesso total ao sistema, incluindo gerenciamento de usuários e sem limites de contas.
+                Você tem acesso total ao sistema, incluindo gerenciamento de usuários e acesso ilimitado a contas.
               </p>
             )}
           </CardContent>
