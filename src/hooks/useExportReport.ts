@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { exportCampaignReport } from '@/lib/pdfExport';
 import { toast } from '@/hooks/use-toast';
+import { useReportTemplate } from './useReportTemplate';
 
 interface ExportReportOptions {
   title: string;
@@ -21,6 +22,7 @@ interface ExportReportOptions {
 
 export const useExportReport = () => {
   const [isExporting, setIsExporting] = useState(false);
+  const { template } = useReportTemplate();
 
   const exportReport = async (options: ExportReportOptions) => {
     setIsExporting(true);
@@ -30,7 +32,14 @@ export const useExportReport = () => {
         options.period,
         options.metrics,
         options.campaigns,
-        options.chartIds
+        options.chartIds,
+        template ? {
+          logoUrl: template.logo_url || undefined,
+          primaryColor: template.primary_color,
+          secondaryColor: template.secondary_color,
+          headerText: template.header_text,
+          footerText: template.footer_text || undefined,
+        } : undefined
       );
       toast({
         title: 'Relatório exportado',

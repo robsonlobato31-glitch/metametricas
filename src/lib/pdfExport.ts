@@ -19,28 +19,61 @@ export const captureChartAsImage = async (elementId: string): Promise<string | n
   }
 };
 
-export const generateReportHeader = (
+const hexToRgb = (hex: string): [number, number, number] => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
+    : [59, 130, 246]; // Default blue
+};
+
+export const generateReportHeader = async (
   doc: jsPDF,
   title: string,
   period: string,
-  startY: number = 20
-): number => {
+  startY: number = 20,
+  options?: {
+    logoUrl?: string;
+    primaryColor?: string;
+    headerText?: string;
+  }
+): Promise<number> => {
+  const primaryColor = options?.primaryColor || '#3B82F6';
+  const rgb = hexToRgb(primaryColor);
+  
+  // Add logo if provided
+  if (options?.logoUrl) {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = options.logoUrl!;
+      });
+      doc.addImage(img, 'PNG', 20, startY, 30, 30);
+    } catch (error) {
+      console.error('Error loading logo:', error);
+    }
+  }
+
+  // Header text with custom color
   doc.setFontSize(20);
-  doc.setTextColor(30, 30, 30);
-  doc.text(title, 20, startY);
+  doc.setTextColor(...rgb);
+  const headerText = options?.headerText || title;
+  doc.text(headerText, options?.logoUrl ? 55 : 20, startY + 10);
 
   doc.setFontSize(11);
   doc.setTextColor(100, 100, 100);
-  doc.text(period, 20, startY + 8);
+  doc.text(period, options?.logoUrl ? 55 : 20, startY + 18);
 
   const now = new Date();
   const generatedText = `Gerado em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
-  doc.text(generatedText, 20, startY + 14);
+  doc.text(generatedText, options?.logoUrl ? 55 : 20, startY + 24);
 
-  doc.setDrawColor(200, 200, 200);
-  doc.line(20, startY + 18, 190, startY + 18);
+  doc.setDrawColor(...rgb);
+  doc.line(20, startY + 32, 190, startY + 32);
 
-  return startY + 25;
+  return startY + 38;
 };
 
 export const addMetricsSection = (
@@ -162,11 +195,23 @@ export const exportCampaignReport = async (
   chartIds?: {
     budgetChart?: string;
     trendChart?: string;
+  },
+  template?: {
+    logoUrl?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    headerText?: string;
+    footerText?: string;
   }
 ) => {
   const doc = new jsPDF();
+  const primaryRgb = template?.primaryColor ? hexToRgb(template.primaryColor) : [59, 130, 246];
 
-  let currentY = generateReportHeader(doc, title, period);
+  let currentY = await generateReportHeader(doc, title, period, 20, {
+    logoUrl: template?.logoUrl || undefined,
+    primaryColor: template?.primaryColor,
+    headerText: template?.headerText,
+  });
 
   currentY = addMetricsSection(doc, metrics, currentY);
 
@@ -178,7 +223,16 @@ export const exportCampaignReport = async (
     currentY = await addChartImage(doc, chartIds.trendChart, 'Evolução de Gastos', currentY);
   }
 
-  addCampaignsTable(doc, campaigns, currentY);
+  currentY = addCampaignsTable(doc, campaigns, currentY);
+
+  // Add footer if provided
+  if (template?.footerText) {
+    const pageHeight = doc.internal.pageSize.height;
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    const footerLines = doc.splitTextToSize(template.footerText, 170);
+    doc.text(footerLines, 105, pageHeight - 15, { align: 'center' });
+  }
 
   const fileName = `relatorio-campanhas-${new Date().toISOString().split('T')[0]}.pdf`;
   doc.save(fileName);

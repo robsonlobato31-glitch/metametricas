@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { usePlan } from '@/hooks/usePlan';
 import { User, Shield, CreditCard, LogOut } from 'lucide-react';
+import { ReportTemplateSettings } from '@/components/settings/ReportTemplateSettings';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -114,6 +115,9 @@ export default function Settings() {
             )}
           </CardContent>
         </Card>
+
+        {/* Report Template Settings */}
+        <ReportTemplateSettings />
 
         {/* Actions Card */}
         <Card>
