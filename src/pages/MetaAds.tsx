@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -99,8 +98,7 @@ export default function MetaAds() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Meta Ads</h1>
           <p className="text-muted-foreground mt-1">
@@ -243,6 +241,5 @@ export default function MetaAds() {
           </>
         )}
       </div>
-    </DashboardLayout>
   );
 }

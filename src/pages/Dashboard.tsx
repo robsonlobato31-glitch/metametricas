@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { DashboardLayout as Layout } from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { Edit3, Plus, RotateCcw, Save } from 'lucide-react';
@@ -66,8 +65,7 @@ export default function Dashboard() {
   };
 
   return (
-    <Layout>
-      <div className="space-y-6" data-tour="dashboard">
+    <div className="space-y-6" data-tour="dashboard">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -146,6 +144,5 @@ export default function Dashboard() {
           existingWidgetIds={layout.widgets.map(w => w.id)}
         />
       </div>
-    </Layout>
   );
 }
