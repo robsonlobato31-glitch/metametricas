@@ -14,16 +14,433 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ad_accounts: {
+        Row: {
+          account_id: string
+          account_name: string
+          created_at: string
+          currency: string | null
+          id: string
+          integration_id: string
+          is_active: boolean
+          provider: Database["public"]["Enums"]["integration_provider"]
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          account_name: string
+          created_at?: string
+          currency?: string | null
+          id?: string
+          integration_id: string
+          is_active?: boolean
+          provider: Database["public"]["Enums"]["integration_provider"]
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          account_name?: string
+          created_at?: string
+          currency?: string | null
+          id?: string
+          integration_id?: string
+          is_active?: boolean
+          provider?: Database["public"]["Enums"]["integration_provider"]
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_accounts_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_alerts: {
+        Row: {
+          alert_type: string
+          campaign_id: string
+          created_at: string
+          current_amount: number
+          id: string
+          is_active: boolean
+          resolved_at: string | null
+          threshold_amount: number
+          triggered_at: string
+        }
+        Insert: {
+          alert_type?: string
+          campaign_id: string
+          created_at?: string
+          current_amount: number
+          id?: string
+          is_active?: boolean
+          resolved_at?: string | null
+          threshold_amount: number
+          triggered_at?: string
+        }
+        Update: {
+          alert_type?: string
+          campaign_id?: string
+          created_at?: string
+          current_amount?: number
+          id?: string
+          is_active?: boolean
+          resolved_at?: string | null
+          threshold_amount?: number
+          triggered_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_alerts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          ad_account_id: string
+          budget: number | null
+          campaign_id: string
+          created_at: string
+          daily_budget: number | null
+          end_date: string | null
+          id: string
+          lifetime_budget: number | null
+          name: string
+          objective: string | null
+          start_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ad_account_id: string
+          budget?: number | null
+          campaign_id: string
+          created_at?: string
+          daily_budget?: number | null
+          end_date?: string | null
+          id?: string
+          lifetime_budget?: number | null
+          name: string
+          objective?: string | null
+          start_date?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          ad_account_id?: string
+          budget?: number | null
+          campaign_id?: string
+          created_at?: string
+          daily_budget?: number | null
+          end_date?: string | null
+          id?: string
+          lifetime_budget?: number | null
+          name?: string
+          objective?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integrations: {
+        Row: {
+          access_token: string | null
+          config: Json | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          integration_source: string | null
+          provider: Database["public"]["Enums"]["integration_provider"]
+          refresh_token: string | null
+          status: Database["public"]["Enums"]["integration_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          config?: Json | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          integration_source?: string | null
+          provider: Database["public"]["Enums"]["integration_provider"]
+          refresh_token?: string | null
+          status?: Database["public"]["Enums"]["integration_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          config?: Json | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          integration_source?: string | null
+          provider?: Database["public"]["Enums"]["integration_provider"]
+          refresh_token?: string | null
+          status?: Database["public"]["Enums"]["integration_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      metrics: {
+        Row: {
+          campaign_id: string
+          clicks: number | null
+          conversions: number | null
+          cpc: number | null
+          created_at: string
+          ctr: number | null
+          date: string
+          id: string
+          impressions: number | null
+          initiated_checkout: number | null
+          link_clicks: number | null
+          page_views: number | null
+          purchases: number | null
+          spend: number | null
+          updated_at: string
+          video_views_100: number | null
+          video_views_25: number | null
+          video_views_50: number | null
+          video_views_75: number | null
+        }
+        Insert: {
+          campaign_id: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          date: string
+          id?: string
+          impressions?: number | null
+          initiated_checkout?: number | null
+          link_clicks?: number | null
+          page_views?: number | null
+          purchases?: number | null
+          spend?: number | null
+          updated_at?: string
+          video_views_100?: number | null
+          video_views_25?: number | null
+          video_views_50?: number | null
+          video_views_75?: number | null
+        }
+        Update: {
+          campaign_id?: string
+          clicks?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          date?: string
+          id?: string
+          impressions?: number | null
+          initiated_checkout?: number | null
+          link_clicks?: number | null
+          page_views?: number | null
+          purchases?: number | null
+          spend?: number | null
+          updated_at?: string
+          video_views_100?: number | null
+          video_views_25?: number | null
+          video_views_50?: number | null
+          video_views_75?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metrics_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_logs: {
+        Row: {
+          accounts_synced: number | null
+          campaigns_synced: number | null
+          created_at: string
+          error_details: Json | null
+          error_message: string | null
+          finished_at: string | null
+          function_name: string
+          id: string
+          integration_id: string
+          metrics_synced: number | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          accounts_synced?: number | null
+          campaigns_synced?: number | null
+          created_at?: string
+          error_details?: Json | null
+          error_message?: string | null
+          finished_at?: string | null
+          function_name: string
+          id?: string
+          integration_id: string
+          metrics_synced?: number | null
+          started_at?: string
+          status: string
+        }
+        Update: {
+          accounts_synced?: number | null
+          campaigns_synced?: number | null
+          created_at?: string
+          error_details?: Json | null
+          error_message?: string | null
+          finished_at?: string | null
+          function_name?: string
+          id?: string
+          integration_id?: string
+          metrics_synced?: number | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_plans: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          max_accounts: number
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          started_at: string
+          status: Database["public"]["Enums"]["plan_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          max_accounts?: number
+          plan_type?: Database["public"]["Enums"]["plan_type"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["plan_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          max_accounts?: number
+          plan_type?: Database["public"]["Enums"]["plan_type"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["plan_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_detailed_metrics: {
+        Args: { p_date_from: string; p_date_to: string; p_user_id: string }
+        Returns: {
+          avg_cpc: number
+          avg_ctr: number
+          provider: string
+          total_clicks: number
+          total_conversions: number
+          total_impressions: number
+          total_initiated_checkout: number
+          total_link_clicks: number
+          total_page_views: number
+          total_purchases: number
+          total_spend: number
+          total_video_views_100: number
+          total_video_views_25: number
+          total_video_views_50: number
+          total_video_views_75: number
+        }[]
+      }
+      get_user_plan: {
+        Args: { p_user_id: string }
+        Returns: {
+          accounts_used: number
+          can_add_account: boolean
+          expires_at: string
+          is_at_limit: boolean
+          max_accounts: number
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          status: Database["public"]["Enums"]["plan_status"]
+        }[]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "user" | "admin" | "super_admin"
+      integration_provider: "meta" | "google"
+      integration_status: "active" | "expired" | "error" | "disconnected"
+      plan_status: "active" | "expired" | "cancelled" | "suspended"
+      plan_type: "survival" | "professional" | "agency" | "enterprise"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +567,12 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["user", "admin", "super_admin"],
+      integration_provider: ["meta", "google"],
+      integration_status: ["active", "expired", "error", "disconnected"],
+      plan_status: ["active", "expired", "cancelled", "suspended"],
+      plan_type: ["survival", "professional", "agency", "enterprise"],
+    },
   },
 } as const
