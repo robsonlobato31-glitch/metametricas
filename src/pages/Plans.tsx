@@ -1,57 +1,27 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Check, Crown, Pencil } from 'lucide-react';
 import { usePlan } from '@/hooks/usePlan';
 import { useUserRole } from '@/hooks/useUserRole';
-
-const plans = [
-  {
-    name: 'Básico',
-    price: 'R$ 97',
-    period: '/mês',
-    features: [
-      'Até 3 campanhas',
-      '1 usuário',
-      'Relatórios básicos',
-      'Suporte por email',
-    ],
-    type: 'basic' as const,
-  },
-  {
-    name: 'Pro',
-    price: 'R$ 297',
-    period: '/mês',
-    features: [
-      'Campanhas ilimitadas',
-      '5 usuários',
-      'Relatórios avançados',
-      'Suporte prioritário',
-      'IA incluída',
-    ],
-    type: 'pro' as const,
-    highlighted: true,
-  },
-  {
-    name: 'Enterprise',
-    price: 'R$ 997',
-    period: '/mês',
-    features: [
-      'Tudo do Pro',
-      'Usuários ilimitados',
-      'White label',
-      'Suporte dedicado',
-      'API custom',
-    ],
-    type: 'enterprise' as const,
-  },
-];
+import { usePlanConfigs } from '@/hooks/usePlanConfigs';
+import { EditPlanDialog } from '@/components/plans/EditPlanDialog';
 
 export default function Plans() {
   const { plan_type, accounts_used, max_accounts, trial_ends_at, isLoading } = usePlan();
   const { isSuperAdmin } = useUserRole();
+  const { planConfigs, updatePlanConfig } = usePlanConfigs();
+  const [editingPlan, setEditingPlan] = useState<typeof planConfigs[0] | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const isTrialActive = trial_ends_at && new Date(trial_ends_at) > new Date();
+
+  const handleEditPlan = (plan: typeof planConfigs[0]) => {
+    setEditingPlan(plan);
+    setDialogOpen(true);
+  };
 
   return (
     <div className="space-y-8 p-6">
@@ -89,16 +59,100 @@ export default function Plans() {
         </CardContent>
       </Card>
 
+      {/* Configuração de Planos - Super Admin */}
+      {isSuperAdmin && planConfigs && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-primary" />
+              <CardTitle>Configuração de Planos</CardTitle>
+            </div>
+            <CardDescription>
+              Edite as informações exibidas nos popups de upgrade
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue={planConfigs[0]?.plan_type} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                {planConfigs.map((plan) => (
+                  <TabsTrigger key={plan.plan_type} value={plan.plan_type}>
+                    {plan.name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {planConfigs.map((plan) => (
+                <TabsContent key={plan.plan_type} value={plan.plan_type} className="space-y-4 mt-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-2xl font-bold">{plan.name}</h3>
+                      <p className="text-3xl font-bold mt-2">
+                        {plan.price_display}
+                        <span className="text-base text-muted-foreground font-normal"> /mês</span>
+                      </p>
+                      {plan.description && (
+                        <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditPlan(plan)}
+                      className="gap-2"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3 mt-4">
+                    <p className="font-medium text-sm">Recursos inclusos:</p>
+                    <ul className="space-y-2">
+                      {plan.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm">
+                          <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {plan.hotmart_url && (
+                    <div className="pt-4 border-t">
+                      <p className="text-sm text-muted-foreground mb-1">URL Kiwify:</p>
+                      <a
+                        href={plan.hotmart_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline break-all"
+                      >
+                        {plan.hotmart_url}
+                      </a>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Status:</span>
+                    <Badge variant={plan.is_active ? 'default' : 'secondary'}>
+                      {plan.is_active ? 'Ativo' : 'Inativo'}
+                    </Badge>
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Planos Disponíveis */}
-      {!isSuperAdmin && (
+      {!isSuperAdmin && planConfigs && (
         <div className="grid gap-6 md:grid-cols-3">
-          {plans.map((planOption) => {
-            const isCurrentPlan = plan_type === planOption.type;
+          {planConfigs.map((planOption) => {
+            const isCurrentPlan = plan_type === planOption.plan_type;
             
             return (
               <Card 
-                key={planOption.name}
-                className={planOption.highlighted ? 'border-primary shadow-lg' : ''}
+                key={planOption.plan_type}
+                className={planOption.is_highlighted ? 'border-primary shadow-lg' : ''}
               >
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -108,8 +162,8 @@ export default function Plans() {
                     )}
                   </div>
                   <div className="mt-4">
-                    <span className="text-4xl font-bold">{planOption.price}</span>
-                    <span className="text-muted-foreground">{planOption.period}</span>
+                    <span className="text-4xl font-bold">{planOption.price_display}</span>
+                    <span className="text-muted-foreground"> /mês</span>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -164,6 +218,13 @@ export default function Plans() {
           </CardContent>
         </Card>
       )}
+
+      <EditPlanDialog
+        plan={editingPlan}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSave={updatePlanConfig}
+      />
     </div>
   );
 }
