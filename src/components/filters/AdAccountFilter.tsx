@@ -20,12 +20,12 @@ export const AdAccountFilter = ({ value, onChange, provider }: AdAccountFilterPr
   return (
     <div className="space-y-2">
       <Label htmlFor="ad-account">Conta de Anúncios</Label>
-      <Select value={value || ''} onValueChange={(val) => onChange(val || undefined)}>
+      <Select value={value || 'all'} onValueChange={(val) => onChange(val === 'all' ? undefined : val)}>
         <SelectTrigger id="ad-account">
           <SelectValue placeholder={isLoading ? 'Carregando...' : 'Todas as contas'} />
         </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="">Todas as contas</SelectItem>
+        <SelectContent className="bg-popover z-50">
+          <SelectItem value="all">Todas as contas</SelectItem>
           {accounts?.map((account) => (
             <SelectItem key={account.id} value={account.id}>
               {account.account_name}

@@ -66,16 +66,16 @@ export const BreakdownFilter = ({
         <div className="space-y-2">
           <Label htmlFor="breakdown-type">Tipo de Segmentação</Label>
           <Select
-            value={breakdownType || ''}
+            value={breakdownType || 'all'}
             onValueChange={(value) =>
-              onBreakdownTypeChange(value ? (value as BreakdownType) : undefined)
+              onBreakdownTypeChange(value === 'all' ? undefined : (value as BreakdownType))
             }
           >
             <SelectTrigger id="breakdown-type">
               <SelectValue placeholder="Selecione o tipo" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+            <SelectContent className="bg-popover z-50">
+              <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="age">Idade</SelectItem>
               <SelectItem value="gender">Gênero</SelectItem>
               <SelectItem value="device_platform">Dispositivo</SelectItem>
@@ -88,14 +88,14 @@ export const BreakdownFilter = ({
           <div className="space-y-2">
             <Label htmlFor="breakdown-value">Valor</Label>
             <Select
-              value={breakdownValue || ''}
-              onValueChange={(value) => onBreakdownValueChange(value || undefined)}
+              value={breakdownValue || 'all'}
+              onValueChange={(value) => onBreakdownValueChange(value === 'all' ? undefined : value)}
             >
               <SelectTrigger id="breakdown-value">
                 <SelectValue placeholder="Selecione o valor" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+              <SelectContent className="bg-popover z-50">
+                <SelectItem value="all">Todos</SelectItem>
                 {getValueOptions().map((option) => (
                   <SelectItem key={option} value={option}>
                     {getValueLabel(option)}

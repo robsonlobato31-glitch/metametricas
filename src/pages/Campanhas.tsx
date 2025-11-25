@@ -191,7 +191,7 @@ export default function Campanhas() {
               <SelectTrigger>
                 <SelectValue placeholder="Plataforma" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover">
                 <SelectItem value="all">Todas as Plataformas</SelectItem>
                 <SelectItem value="meta">Meta Ads</SelectItem>
                 <SelectItem value="google">Google Ads</SelectItem>
@@ -205,7 +205,7 @@ export default function Campanhas() {
               <SelectTrigger>
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover">
                 <SelectItem value="all">Todos os Status</SelectItem>
                 <SelectItem value="ACTIVE">Ativas</SelectItem>
                 <SelectItem value="PAUSED">Pausadas</SelectItem>
