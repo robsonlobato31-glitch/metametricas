@@ -50,35 +50,46 @@ serve(async (req) => {
 
     const accessToken = await getValidAccessToken(supabaseClient, integration.id);
 
-    // Buscar ad accounts do usuário
-    const meResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,currency,account_status&access_token=${accessToken}`
-    );
+    // Buscar TODAS as ad accounts do usuário com paginação
+    let allAdAccounts: any[] = [];
+    let nextUrl: string | null = `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,currency,account_status&limit=1000&access_token=${accessToken}`;
+    
+    while (nextUrl) {
+      console.log(`[${logId}] Buscando contas Meta Ads...`);
+      const meResponse: any = await fetch(nextUrl);
 
-    if (!meResponse.ok) {
-      const errorText = await meResponse.text();
-      
-      // Check if it's an expired token error
-      if (errorText.includes('Session has expired') || errorText.includes('OAuthException')) {
-        // Mark integration as expired
-        await supabaseClient
-          .from('integrations')
-          .update({ status: 'expired' })
-          .eq('id', integration.id);
+      if (!meResponse.ok) {
+        const errorText = await meResponse.text();
         
-        console.error(`[${logId}] Token Meta expirado, marcando integração como expirada`);
+        // Check if it's an expired token error
+        if (errorText.includes('Session has expired') || errorText.includes('OAuthException')) {
+          // Mark integration as expired
+          await supabaseClient
+            .from('integrations')
+            .update({ status: 'expired' })
+            .eq('id', integration.id);
+          
+          console.error(`[${logId}] Token Meta expirado, marcando integração como expirada`);
+        }
+        
+        throw new Error(`Erro ao buscar contas Meta: ${errorText}`);
       }
-      
-      throw new Error(`Erro ao buscar contas Meta: ${errorText}`);
-    }
 
-    const { data: adAccounts } = await meResponse.json();
-    console.log(`[${logId}] Encontradas ${adAccounts.length} contas Meta Ads`);
+      const response: any = await meResponse.json();
+      allAdAccounts = [...allAdAccounts, ...response.data];
+      
+      // Verificar se há mais páginas
+      nextUrl = response.paging?.next || null;
+      
+      console.log(`[${logId}] Coletadas ${allAdAccounts.length} contas até agora...`);
+    }
+    
+    console.log(`[${logId}] Total de ${allAdAccounts.length} contas Meta Ads encontradas`);
 
     let accountsSynced = 0;
     let campaignsSynced = 0;
 
-    for (const account of adAccounts) {
+    for (const account of allAdAccounts) {
       try {
         const accountId = account.id.replace('act_', '');
 
@@ -102,33 +113,42 @@ serve(async (req) => {
 
         if (!dbAccount) continue;
 
-        // Buscar campanhas da conta
-        const campaignsResponse = await fetch(
-          `https://graph.facebook.com/v18.0/act_${accountId}/campaigns?` +
+        // Buscar TODAS as campanhas da conta com paginação
+        let allCampaigns: any[] = [];
+        let campaignsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/campaigns?` +
           `fields=id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time&` +
-          `access_token=${accessToken}`
-        );
+          `limit=1000&access_token=${accessToken}`;
 
-        if (campaignsResponse.ok) {
-          const { data: campaigns } = await campaignsResponse.json();
+        while (campaignsNextUrl) {
+          const campaignsResponse: any = await fetch(campaignsNextUrl);
 
-          for (const campaign of campaigns) {
-            await supabaseClient.from('campaigns').upsert({
-              ad_account_id: dbAccount.id,
-              campaign_id: campaign.id,
-              name: campaign.name,
-              status: campaign.status,
-              objective: campaign.objective,
-              daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : null,
-              lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : null,
-              start_date: campaign.start_time ? new Date(campaign.start_time).toISOString().split('T')[0] : null,
-              end_date: campaign.stop_time ? new Date(campaign.stop_time).toISOString().split('T')[0] : null,
-            }, {
-              onConflict: 'ad_account_id,campaign_id',
-            });
-
-            campaignsSynced++;
+          if (campaignsResponse.ok) {
+            const campaignsData: any = await campaignsResponse.json();
+            allCampaigns = [...allCampaigns, ...campaignsData.data];
+            campaignsNextUrl = campaignsData.paging?.next || null;
+          } else {
+            campaignsNextUrl = null;
           }
+        }
+
+        console.log(`[${logId}] Encontradas ${allCampaigns.length} campanhas para conta ${account.name}`);
+
+        for (const campaign of allCampaigns) {
+          await supabaseClient.from('campaigns').upsert({
+            ad_account_id: dbAccount.id,
+            campaign_id: campaign.id,
+            name: campaign.name,
+            status: campaign.status,
+            objective: campaign.objective,
+            daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : null,
+            lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : null,
+            start_date: campaign.start_time ? new Date(campaign.start_time).toISOString().split('T')[0] : null,
+            end_date: campaign.stop_time ? new Date(campaign.stop_time).toISOString().split('T')[0] : null,
+          }, {
+            onConflict: 'ad_account_id,campaign_id',
+          });
+
+          campaignsSynced++;
         }
       } catch (error) {
         console.error(`[${logId}] Erro ao sincronizar conta ${account.id}:`, error);
