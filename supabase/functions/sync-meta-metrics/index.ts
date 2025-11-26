@@ -91,46 +91,75 @@ serve(async (req) => {
               const actions = insight.actions || [];
               const costPerActionType = insight.cost_per_action_type || [];
               
+              // Extract conversions - purchases
               const conversions = actions.find((a: any) => 
                 a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
-                a.action_type === 'purchase'
+                a.action_type === 'purchase' ||
+                a.action_type === 'omni_purchase' ||
+                a.action_type === 'app_custom_event.fb_mobile_purchase'
               )?.value || 0;
               
               const linkClicks = actions.find((a: any) => a.action_type === 'link_click')?.value || 0;
               const pageViews = actions.find((a: any) => a.action_type === 'landing_page_view')?.value || 0;
               const initiatedCheckout = actions.find((a: any) => a.action_type === 'initiate_checkout')?.value || 0;
               
-              // Extract results - general conversions based on campaign objective
-              const results = actions.find((a: any) => 
+              // Extract messages - multiple variants
+              const messages = actions.find((a: any) => 
                 a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+                a.action_type === 'onsite_conversion.messaging_first_reply' ||
+                a.action_type === 'messaging_conversation_started_7d' ||
+                a.action_type === 'messaging_first_reply' ||
+                a.action_type === 'lead_grouped'
+              )?.value || 0;
+              
+              // Extract results - based on campaign objective
+              let results = 0;
+              const resultAction = actions.find((a: any) => 
+                a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+                a.action_type === 'messaging_conversation_started_7d' ||
                 a.action_type === 'lead' ||
                 a.action_type === 'purchase' ||
                 a.action_type === 'omni_purchase' ||
                 a.action_type === 'link_click' ||
                 a.action_type === 'landing_page_view'
-              )?.value || 0;
+              );
+              results = resultAction ? parseInt(resultAction.value) : 0;
               
-              // Extract messages
-              const messages = actions.find((a: any) => 
-                a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-                a.action_type === 'onsite_conversion.messaging_first_reply'
-              )?.value || 0;
+              // Extract cost per message
+              let costPerMessage = 0;
+              const costPerMessageAction = costPerActionType.find((c: any) =>
+                c.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+                c.action_type === 'onsite_conversion.messaging_first_reply' ||
+                c.action_type === 'messaging_conversation_started_7d' ||
+                c.action_type === 'messaging_first_reply' ||
+                c.action_type === 'lead_grouped'
+              );
+              costPerMessage = costPerMessageAction ? parseFloat(costPerMessageAction.value) : 0;
+              
+              // Calculate cost per message if not provided but we have messages
+              if (costPerMessage === 0 && messages > 0 && insight.spend) {
+                costPerMessage = parseFloat(insight.spend) / parseInt(messages);
+              }
               
               // Extract cost per result
-              const costPerResult = costPerActionType.find((c: any) =>
+              let costPerResult = 0;
+              const costPerResultAction = costPerActionType.find((c: any) =>
                 c.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+                c.action_type === 'messaging_conversation_started_7d' ||
                 c.action_type === 'lead' ||
                 c.action_type === 'purchase' ||
                 c.action_type === 'omni_purchase' ||
                 c.action_type === 'link_click' ||
                 c.action_type === 'landing_page_view'
-              )?.value || 0;
+              );
+              costPerResult = costPerResultAction ? parseFloat(costPerResultAction.value) : 0;
               
-              // Extract cost per message
-              const costPerMessage = costPerActionType.find((c: any) =>
-                c.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-                c.action_type === 'onsite_conversion.messaging_first_reply'
-              )?.value || 0;
+              // Calculate cost per result if not provided but we have results
+              if (costPerResult === 0 && results > 0 && insight.spend) {
+                costPerResult = parseFloat(insight.spend) / results;
+              }
+              
+              console.log(`[${logId}] Campanha ${campaign.name} - Data: ${insight.date_start} - Messages: ${messages}, Results: ${results}, Cost/Message: ${costPerMessage}, Cost/Result: ${costPerResult}`);
 
               const { error: upsertError } = await supabaseClient.from('metrics').upsert({
                 campaign_id: campaign.id,
@@ -145,10 +174,10 @@ serve(async (req) => {
                 page_views: parseInt(pageViews) || 0,
                 initiated_checkout: parseInt(initiatedCheckout) || 0,
                 purchases: parseInt(conversions) || 0,
-                results: parseInt(results) || 0,
-                messages: parseInt(messages) || 0,
-                cost_per_result: parseFloat(costPerResult) || 0,
-                cost_per_message: parseFloat(costPerMessage) || 0,
+                results: results || 0,
+                messages: messages || 0,
+                cost_per_result: costPerResult || 0,
+                cost_per_message: costPerMessage || 0,
               }, {
                 onConflict: 'campaign_id,date',
               });

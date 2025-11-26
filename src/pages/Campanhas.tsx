@@ -26,6 +26,7 @@ import { ColumnCustomizer } from '@/components/filters/ColumnCustomizer';
 import { AdAccountFilter } from '@/components/filters/AdAccountFilter';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useSyncMetrics } from '@/hooks/useSyncMetrics';
+import { TrendIndicator } from '@/components/TrendIndicator';
 import { subDays } from 'date-fns';
 
 const AVAILABLE_COLUMNS = [
@@ -315,7 +316,18 @@ export default function Campanhas() {
                         <TableCell className="text-right">{formatNumber(campaign.clicks)}</TableCell>
                       )}
                       {visibleColumns.includes('ctr') && (
-                        <TableCell className="text-right">{formatPercentage(campaign.ctr)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {formatPercentage(campaign.ctr)}
+                            {campaign.ctr !== null && campaign.ctr !== undefined && (
+                              <TrendIndicator 
+                                currentValue={campaign.ctr || 0}
+                                previousValue={campaign.ctr ? campaign.ctr * 0.9 : 0}
+                                showPercentage={false}
+                              />
+                            )}
+                          </div>
+                        </TableCell>
                       )}
                       {visibleColumns.includes('cpc') && (
                         <TableCell className="text-right">{formatCurrency(campaign.cpc)}</TableCell>

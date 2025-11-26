@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
 
 const mainItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
@@ -65,10 +66,14 @@ export function AppSidebar() {
   const userInitials = user?.email?.[0]?.toUpperCase() || 'U';
 
   return (
-    <Sidebar className={collapsed ? 'w-14' : 'w-60'}>
+    <Sidebar collapsible="icon" className={collapsed ? 'w-16' : 'w-60'}>
       {/* Header com logo */}
-      <div className="flex items-center h-14 border-b px-3">
-        {!collapsed && (
+      <div className="flex items-center justify-center h-14 border-b px-3">
+        {collapsed ? (
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+            <LayoutDashboard className="h-5 w-5 text-primary-foreground" />
+          </div>
+        ) : (
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <LayoutDashboard className="h-5 w-5 text-primary-foreground" />
@@ -187,32 +192,32 @@ export function AppSidebar() {
 
       {/* Footer com usuário */}
       <SidebarFooter className="border-t p-3">
-        <div className="flex items-center gap-2">
+        <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
           <Avatar className="h-8 w-8">
             <AvatarFallback>{userInitials}</AvatarFallback>
           </Avatar>
           {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {user?.email}
-              </p>
-              {isSuperAdmin && (
-                <p className="text-xs text-muted-foreground">Super Admin</p>
-              )}
-              {isAdmin && !isSuperAdmin && (
-                <p className="text-xs text-muted-foreground">Admin</p>
-              )}
-            </div>
-          )}
-          {!collapsed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={signOut}
-              title="Sair"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {user?.email}
+                </p>
+                {isSuperAdmin && (
+                  <p className="text-xs text-muted-foreground">Super Admin</p>
+                )}
+                {isAdmin && !isSuperAdmin && (
+                  <p className="text-xs text-muted-foreground">Admin</p>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={signOut}
+                title="Sair"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </>
           )}
         </div>
       </SidebarFooter>

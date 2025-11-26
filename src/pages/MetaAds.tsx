@@ -132,22 +132,33 @@ export default function MetaAds() {
                 <Facebook className="h-5 w-5 text-blue-500" />
                 <CardTitle>Status da Integração</CardTitle>
               </div>
-              {isConnected ? (
-                <Badge variant="default" className="gap-1">
-                  <CheckCircle className="h-3 w-3" />
-                  Conectado
-                </Badge>
-              ) : isExpired ? (
-                <Badge variant="destructive" className="gap-1">
-                  <XCircle className="h-3 w-3" />
-                  Token Expirado
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="gap-1">
-                  <XCircle className="h-3 w-3" />
-                  Desconectado
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {isConnected ? (
+                  <>
+                    <Badge variant="default" className="gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      Conectado
+                    </Badge>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setShowEditToken(true)}
+                    >
+                      Editar
+                    </Button>
+                  </>
+                ) : isExpired ? (
+                  <Badge variant="destructive" className="gap-1">
+                    <XCircle className="h-3 w-3" />
+                    Token Expirado
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="gap-1">
+                    <XCircle className="h-3 w-3" />
+                    Desconectado
+                  </Badge>
+                )}
+              </div>
             </div>
             <CardDescription>
               {isConnected
@@ -230,21 +241,10 @@ export default function MetaAds() {
           <>
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Sincronizar Dados</CardTitle>
-                    <CardDescription>
-                      Importe campanhas e métricas do Meta Ads
-                    </CardDescription>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setShowEditToken(true)}
-                  >
-                    Editar Token
-                  </Button>
-                </div>
+                <CardTitle>Sincronizar Dados</CardTitle>
+                <CardDescription>
+                  Importe campanhas e métricas do Meta Ads
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Button onClick={handleSync} disabled={isSyncing}>
