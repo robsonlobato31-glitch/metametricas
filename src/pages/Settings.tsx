@@ -77,9 +77,12 @@ export default function Settings() {
               {getRoleBadge()}
             </div>
             {isSuperAdmin && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Você tem acesso total ao sistema, incluindo gerenciamento de usuários e acesso ilimitado a contas.
-              </p>
+              <div className="bg-primary/10 text-primary p-3 rounded-lg text-sm mt-2">
+                ✓ Acesso total ao sistema<br />
+                ✓ Gerenciamento de todos os usuários<br />
+                ✓ Contas ilimitadas sem restrições<br />
+                ✓ Todas as funcionalidades premium
+              </div>
             )}
           </CardContent>
         </Card>
@@ -103,10 +106,15 @@ export default function Settings() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Uso de Contas</p>
                   <p className="text-base">
-                    {plan.accounts_used} de {plan.max_accounts === Infinity ? '∞' : plan.max_accounts} contas
+                    {plan.accounts_used} de {plan.max_accounts === Infinity ? '∞ (Ilimitado)' : plan.max_accounts} contas
                   </p>
                 </div>
-                {plan.is_at_limit && (
+                {isSuperAdmin && (
+                  <div className="bg-primary/10 text-primary p-3 rounded-lg text-sm">
+                    Como Super Admin, você tem acesso ilimitado a contas e todas as funcionalidades sem restrições.
+                  </div>
+                )}
+                {!isSuperAdmin && plan.is_at_limit && (
                   <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
                     Você atingiu o limite de contas do seu plano. Faça upgrade para adicionar mais contas.
                   </div>
