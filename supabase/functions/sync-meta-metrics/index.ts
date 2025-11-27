@@ -88,75 +88,156 @@ serve(async (req) => {
 
           if (insights && insights.length > 0) {
             for (const insight of insights) {
-              const actions = insight.actions || [];
-              const costPerActionType = insight.cost_per_action_type || [];
-              
-              // Extract conversions - purchases
-              const conversions = actions.find((a: any) => 
-                a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
-                a.action_type === 'purchase' ||
-                a.action_type === 'omni_purchase' ||
-                a.action_type === 'app_custom_event.fb_mobile_purchase'
-              )?.value || 0;
-              
-              const linkClicks = actions.find((a: any) => a.action_type === 'link_click')?.value || 0;
-              const pageViews = actions.find((a: any) => a.action_type === 'landing_page_view')?.value || 0;
-              const initiatedCheckout = actions.find((a: any) => a.action_type === 'initiate_checkout')?.value || 0;
-              
-              // Extract messages - multiple variants
-              const messages = actions.find((a: any) => 
-                a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-                a.action_type === 'onsite_conversion.messaging_first_reply' ||
-                a.action_type === 'messaging_conversation_started_7d' ||
-                a.action_type === 'messaging_first_reply' ||
-                a.action_type === 'lead_grouped'
-              )?.value || 0;
-              
-              // Extract results - based on campaign objective
-              let results = 0;
-              const resultAction = actions.find((a: any) => 
-                a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-                a.action_type === 'messaging_conversation_started_7d' ||
-                a.action_type === 'lead' ||
-                a.action_type === 'purchase' ||
-                a.action_type === 'omni_purchase' ||
-                a.action_type === 'link_click' ||
-                a.action_type === 'landing_page_view'
-              );
-              results = resultAction ? parseInt(resultAction.value) : 0;
-              
-              // Extract cost per message
-              let costPerMessage = 0;
-              const costPerMessageAction = costPerActionType.find((c: any) =>
-                c.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-                c.action_type === 'onsite_conversion.messaging_first_reply' ||
-                c.action_type === 'messaging_conversation_started_7d' ||
-                c.action_type === 'messaging_first_reply' ||
-                c.action_type === 'lead_grouped'
-              );
-              costPerMessage = costPerMessageAction ? parseFloat(costPerMessageAction.value) : 0;
-              
-              // Calculate cost per message if not provided but we have messages
-              if (costPerMessage === 0 && messages > 0 && insight.spend) {
-                costPerMessage = parseFloat(insight.spend) / parseInt(messages);
+              // Log para debug: mostrar todas as actions disponíveis
+              if (insight.actions && Array.isArray(insight.actions)) {
+                const actionTypes = insight.actions.map((a: any) => a.action_type);
+                console.log(`📊 Available action_types for ${campaign.name} on ${insight.date_start}:`, actionTypes);
               }
               
-              // Extract cost per result
+              // Processar ações (conversões, mensagens, resultados)
+              let conversions = 0;
+              let messages = 0;
+              let results = 0;
               let costPerResult = 0;
-              const costPerResultAction = costPerActionType.find((c: any) =>
-                c.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-                c.action_type === 'messaging_conversation_started_7d' ||
-                c.action_type === 'lead' ||
-                c.action_type === 'purchase' ||
-                c.action_type === 'omni_purchase' ||
-                c.action_type === 'link_click' ||
-                c.action_type === 'landing_page_view'
-              );
-              costPerResult = costPerResultAction ? parseFloat(costPerResultAction.value) : 0;
-              
-              // Calculate cost per result if not provided but we have results
+              let costPerMessage = 0;
+              let linkClicks = 0;
+              let pageViews = 0;
+              let initiatedCheckout = 0;
+
+              if (insight.actions && Array.isArray(insight.actions)) {
+                insight.actions.forEach((action: any) => {
+                  const value = parseInt(action.value || '0');
+                  const actionType = action.action_type;
+                  
+                  // CONVERSÕES - Lista expandida de todos os tipos de conversão
+                  const conversionTypes = [
+                    'omni_purchase',
+                    'purchase',
+                    'app_custom_event.fb_mobile_purchase',
+                    'offsite_conversion.fb_pixel_purchase',
+                    'offsite_conversion.custom',
+                    'offsite_conversion.fb_pixel_custom',
+                    'onsite_conversion.post_save',
+                    'lead',
+                    'complete_registration',
+                    'omni_complete_registration',
+                    'app_install',
+                    'omni_app_install',
+                    'onsite_web_app_purchase',
+                    'onsite_conversion.purchase',
+                  ];
+                  
+                  if (conversionTypes.some(type => actionType.includes(type))) {
+                    conversions += value;
+                  }
+                  
+                  // MENSAGENS - Lista expandida para capturar conversas
+                  const messageTypes = [
+                    'messaging_conversation_started_7d',
+                    'onsite_conversion.messaging_conversation_started_7d',
+                    'messaging_first_reply',
+                    'contact',
+                    'contact_total',
+                    'onsite_conversion.messaging_block',
+                    'messaging_user_depth_3_7d',
+                  ];
+                  
+                  if (messageTypes.some(type => actionType.includes(type))) {
+                    messages += value;
+                  }
+                  
+                  // RESULTADOS - Lista expandida baseada em objetivos comuns
+                  const resultTypes = [
+                    'lead_grouped',
+                    'onsite_conversion.lead_grouped',
+                    'offsite_conversion.fb_pixel_lead',
+                    'link_click',
+                    'post_engagement',
+                    'page_engagement',
+                    'post_reaction',
+                    'comment',
+                    'video_view',
+                    'landing_page_view',
+                    'onsite_web_lead',
+                    'offsite_conversion.fb_pixel_view_content',
+                    'onsite_conversion.messaging_conversation_started_7d',
+                  ];
+                  
+                  if (resultTypes.some(type => actionType.includes(type))) {
+                    results += value;
+                  }
+                  
+                  // Extrair métricas específicas
+                  if (actionType === 'link_click') linkClicks += value;
+                  if (actionType === 'landing_page_view') pageViews += value;
+                  if (actionType === 'initiate_checkout') initiatedCheckout += value;
+                });
+                
+                // FALLBACK: Se não encontramos resultados específicos, usar o primeiro action disponível
+                if (results === 0 && insight.actions.length > 0) {
+                  // Prioridade: conversões > mensagens > primeira action disponível
+                  if (conversions > 0) {
+                    results = conversions;
+                    console.log(`📊 Using conversions as results: ${results}`);
+                  } else if (messages > 0) {
+                    results = messages;
+                    console.log(`📊 Using messages as results: ${results}`);
+                  } else {
+                    // Pegar a primeira action que não seja impression ou reach
+                    const firstAction = insight.actions.find((a: any) => 
+                      !['impression', 'reach', 'frequency'].includes(a.action_type)
+                    );
+                    if (firstAction) {
+                      results = parseInt(firstAction.value || '0');
+                      console.log(`📊 Using first action as results: ${firstAction.action_type} = ${results}`);
+                    }
+                  }
+                }
+              }
+
+              // Processar cost_per_action_type
+              if (insight.cost_per_action_type && Array.isArray(insight.cost_per_action_type)) {
+                insight.cost_per_action_type.forEach((costAction: any) => {
+                  const cost = parseFloat(costAction.value || '0');
+                  const actionType = costAction.action_type;
+                  
+                  // Custo por resultado
+                  const resultCostTypes = [
+                    'lead_grouped',
+                    'onsite_conversion.lead_grouped',
+                    'offsite_conversion.fb_pixel_lead',
+                    'link_click',
+                    'post_engagement',
+                    'page_engagement',
+                    'landing_page_view',
+                  ];
+                  
+                  if (resultCostTypes.some(type => actionType.includes(type)) && costPerResult === 0) {
+                    costPerResult = cost;
+                  }
+                  
+                  // Custo por mensagem
+                  const messageCostTypes = [
+                    'messaging_conversation_started_7d',
+                    'onsite_conversion.messaging_conversation_started_7d',
+                    'messaging_first_reply',
+                  ];
+                  
+                  if (messageCostTypes.some(type => actionType.includes(type)) && costPerMessage === 0) {
+                    costPerMessage = cost;
+                  }
+                });
+              }
+
+              // CALCULAR custos se não vieram da API
               if (costPerResult === 0 && results > 0 && insight.spend) {
                 costPerResult = parseFloat(insight.spend) / results;
+                console.log(`💰 Calculated cost per result: ${costPerResult.toFixed(2)}`);
+              }
+
+              if (costPerMessage === 0 && messages > 0 && insight.spend) {
+                costPerMessage = parseFloat(insight.spend) / messages;
+                console.log(`💰 Calculated cost per message: ${costPerMessage.toFixed(2)}`);
               }
               
               console.log(`[${logId}] Campanha ${campaign.name} - Data: ${insight.date_start} - Messages: ${messages}, Results: ${results}, Cost/Message: ${costPerMessage}, Cost/Result: ${costPerResult}`);
@@ -167,13 +248,13 @@ serve(async (req) => {
                 impressions: parseInt(insight.impressions) || 0,
                 clicks: parseInt(insight.clicks) || 0,
                 spend: parseFloat(insight.spend) || 0,
-                conversions: parseInt(conversions) || 0,
+                conversions: conversions || 0,
                 ctr: parseFloat(insight.ctr) || 0,
                 cpc: parseFloat(insight.cpc) || 0,
-                link_clicks: parseInt(linkClicks) || 0,
-                page_views: parseInt(pageViews) || 0,
-                initiated_checkout: parseInt(initiatedCheckout) || 0,
-                purchases: parseInt(conversions) || 0,
+                link_clicks: linkClicks || 0,
+                page_views: pageViews || 0,
+                initiated_checkout: initiatedCheckout || 0,
+                purchases: conversions || 0,
                 results: results || 0,
                 messages: messages || 0,
                 cost_per_result: costPerResult || 0,
