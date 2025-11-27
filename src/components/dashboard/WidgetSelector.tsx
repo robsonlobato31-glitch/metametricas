@@ -5,15 +5,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { DashboardWidget, WidgetType } from '@/types/dashboard';
 import { DollarSign, Users, MousePointerClick, TrendingUp, BarChart3, List, Bell, Zap } from 'lucide-react';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 
 interface WidgetSelectorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectWidget: (widget: DashboardWidget) => void;
+  onRemoveWidget: (widgetId: string) => void;
   existingWidgetIds: string[];
 }
 
@@ -101,31 +103,44 @@ export const WidgetSelector = ({
   open,
   onOpenChange,
   onSelectWidget,
+  onRemoveWidget,
   existingWidgetIds,
 }: WidgetSelectorProps) => {
-  const availableWidgets = AVAILABLE_WIDGETS.filter(
-    (widget) => !existingWidgetIds.includes(widget.type)
-  );
+  const categories = Array.from(new Set(AVAILABLE_WIDGETS.map(w => w.category)));
 
-  const categories = Array.from(new Set(availableWidgets.map(w => w.category)));
+  const isWidgetActive = (widgetType: WidgetType) => {
+    return existingWidgetIds.some(id => id.includes(widgetType));
+  };
 
-  const handleSelectWidget = (widgetConfig: typeof AVAILABLE_WIDGETS[0]) => {
-    const widget: DashboardWidget = {
-      id: `${widgetConfig.type}-${Date.now()}`,
-      type: widgetConfig.type,
-      title: widgetConfig.title,
-    };
-    onSelectWidget(widget);
-    onOpenChange(false);
+  const getWidgetId = (widgetType: WidgetType) => {
+    return existingWidgetIds.find(id => id.includes(widgetType)) || '';
+  };
+
+  const handleToggleWidget = (widgetConfig: typeof AVAILABLE_WIDGETS[0], isActive: boolean) => {
+    if (isActive) {
+      // Adicionar widget
+      const widget: DashboardWidget = {
+        id: `${widgetConfig.type}-${Date.now()}`,
+        type: widgetConfig.type,
+        title: widgetConfig.title,
+      };
+      onSelectWidget(widget);
+    } else {
+      // Remover widget
+      const widgetId = getWidgetId(widgetConfig.type);
+      if (widgetId) {
+        onRemoveWidget(widgetId);
+      }
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Adicionar Widget</DialogTitle>
+          <DialogTitle>Gerenciar Widgets</DialogTitle>
           <DialogDescription>
-            Selecione um widget para adicionar ao seu dashboard
+            Ative ou desative widgets no seu dashboard
           </DialogDescription>
         </DialogHeader>
 
@@ -133,39 +148,42 @@ export const WidgetSelector = ({
           {categories.map((category) => (
             <div key={category}>
               <h3 className="text-sm font-semibold mb-3">{category}</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {availableWidgets
+              <div className="space-y-2">
+                {AVAILABLE_WIDGETS
                   .filter((w) => w.category === category)
-                  .map((widget) => (
-                    <Card
-                      key={widget.type}
-                      className="cursor-pointer hover:border-primary transition-colors"
-                      onClick={() => handleSelectWidget(widget)}
-                    >
-                      <CardHeader className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <widget.icon className="h-5 w-5 text-primary" />
+                  .map((widget) => {
+                    const isActive = isWidgetActive(widget.type);
+                    return (
+                      <Card key={widget.type}>
+                        <CardHeader className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-primary/10">
+                              <widget.icon className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className="text-sm">{widget.title}</CardTitle>
+                              <CardDescription className="text-xs mt-1">
+                                {widget.description}
+                              </CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Label htmlFor={`widget-${widget.type}`} className="text-xs text-muted-foreground">
+                                {isActive ? 'Ativo' : 'Inativo'}
+                              </Label>
+                              <Switch
+                                id={`widget-${widget.type}`}
+                                checked={isActive}
+                                onCheckedChange={(checked) => handleToggleWidget(widget, checked)}
+                              />
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <CardTitle className="text-sm">{widget.title}</CardTitle>
-                            <CardDescription className="text-xs mt-1">
-                              {widget.description}
-                            </CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  ))}
+                        </CardHeader>
+                      </Card>
+                    );
+                  })}
               </div>
             </div>
           ))}
-
-          {availableWidgets.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>Todos os widgets disponíveis já estão no dashboard</p>
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>

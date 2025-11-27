@@ -113,6 +113,9 @@ export const useDashboardLayout = () => {
   const removeWidget = useCallback((widgetId: string) => {
     if (!savedLayout) return;
 
+    console.log('🗑️ Removing widget:', widgetId);
+    console.log('🗑️ Current widgets:', savedLayout.widgets.map(w => w.id));
+
     const newWidgets = savedLayout.widgets.filter(w => w.id !== widgetId);
     const newLayout: DashboardLayout = {
       layouts: {
@@ -123,6 +126,7 @@ export const useDashboardLayout = () => {
       widgets: newWidgets,
     };
 
+    console.log('🗑️ New widgets after removal:', newWidgets.map(w => w.id));
     saveLayoutMutation.mutate(newLayout);
   }, [savedLayout, saveLayoutMutation]);
 

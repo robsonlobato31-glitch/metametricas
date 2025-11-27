@@ -76,13 +76,13 @@ export const QuickActionsWidget = () => {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-3">
-          {actions.map((action) => (
+          {actions.map((action, index) => (
             <Button
               key={action.label}
               variant={action.variant}
               onClick={action.onClick}
               disabled={action.loading}
-              className="h-auto flex-col gap-2 py-4"
+              className={`h-auto flex-col gap-2 py-4 ${index === actions.length - 1 ? 'col-span-2' : ''}`}
             >
               <action.icon className={`h-5 w-5 ${action.loading ? 'animate-spin' : ''}`} />
               <span className="text-xs">{action.label}</span>

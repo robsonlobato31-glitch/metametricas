@@ -10,6 +10,7 @@ import { ResultsWidget } from './widgets/ResultsWidget';
 import { MessagesWidget } from './widgets/MessagesWidget';
 import { CostPerResultWidget } from './widgets/CostPerResultWidget';
 import { useMetrics } from '@/hooks/useMetrics';
+import { useChartData } from '@/hooks/useChartData';
 import { DollarSign, Users, MousePointerClick, TrendingUp } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,7 @@ export const DashboardGrid = ({
   onRemoveWidget,
 }: DashboardGridProps) => {
   const { totals, isLoading } = useMetrics();
+  const { data: chartData, isLoading: chartLoading } = useChartData();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -50,17 +52,6 @@ export const DashboardGrid = ({
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
-
-  // Dados mock para o gráfico
-  const chartData = [
-    { name: 'Seg', value: 4000 },
-    { name: 'Ter', value: 3000 },
-    { name: 'Qua', value: 5000 },
-    { name: 'Qui', value: 2780 },
-    { name: 'Sex', value: 1890 },
-    { name: 'Sáb', value: 2390 },
-    { name: 'Dom', value: 3490 },
-  ];
 
   const renderWidget = (widget: DashboardWidget) => {
     const widgetContent = (() => {
@@ -112,7 +103,7 @@ export const DashboardGrid = ({
         case 'metric-cost-per-result':
           return <CostPerResultWidget />;
         case 'chart-performance':
-          return <ChartWidget title="Performance Semanal" data={chartData} isLoading={isLoading} />;
+          return <ChartWidget title="Performance Semanal" data={chartData} isLoading={chartLoading} />;
         case 'campaign-list':
           return <CampaignListWidget />;
         case 'alerts-list':

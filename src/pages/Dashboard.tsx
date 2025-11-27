@@ -75,10 +75,14 @@ export default function Dashboard() {
     addWidget(widget);
   };
 
-  const handleRemoveWidget = (widgetId: string) => {
+  const handleRemoveWidgetFromGrid = (widgetId: string) => {
     if (confirm('Tem certeza que deseja remover este widget?')) {
       removeWidget(widgetId);
     }
+  };
+
+  const handleRemoveWidgetFromSelector = (widgetId: string) => {
+    removeWidget(widgetId);
   };
 
   return (
@@ -152,7 +156,7 @@ export default function Dashboard() {
           layouts={currentLayouts}
           isEditMode={isEditMode}
           onLayoutChange={handleLayoutChange}
-          onRemoveWidget={handleRemoveWidget}
+          onRemoveWidget={handleRemoveWidgetFromGrid}
         />
 
         {/* Onboarding Tour */}
@@ -163,6 +167,7 @@ export default function Dashboard() {
           open={showWidgetSelector}
           onOpenChange={setShowWidgetSelector}
           onSelectWidget={handleAddWidget}
+          onRemoveWidget={handleRemoveWidgetFromSelector}
           existingWidgetIds={layout.widgets.map(w => w.id)}
         />
       </div>
