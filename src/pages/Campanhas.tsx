@@ -211,6 +211,7 @@ export default function Campanhas() {
                 <SelectItem value="ACTIVE">Ativas</SelectItem>
                 <SelectItem value="PAUSED">Pausadas</SelectItem>
                 <SelectItem value="DELETED">Deletadas</SelectItem>
+                <SelectItem value="HAD_DELIVERY">Tiveram veiculação</SelectItem>
               </SelectContent>
             </Select>
           </div>

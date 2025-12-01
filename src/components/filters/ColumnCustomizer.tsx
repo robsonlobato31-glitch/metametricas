@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Settings2, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -33,18 +33,23 @@ export const ColumnCustomizer = ({
   const { preferences, savePreferences, isSaving } = useColumnPreferences(pageName);
   const [open, setOpen] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    if (preferences?.visible_columns && preferences.visible_columns.length > 0) {
-      setSelectedColumns(preferences.visible_columns);
-      onColumnsChange?.(preferences.visible_columns);
-    } else {
-      // Default: all columns visible
-      const allColumns = availableColumns.map((col) => col.id);
-      setSelectedColumns(allColumns);
-      onColumnsChange?.(allColumns);
+    // Só atualiza uma vez quando as preferências carregam
+    if (!initialized) {
+      if (preferences?.visible_columns && preferences.visible_columns.length > 0) {
+        setSelectedColumns(preferences.visible_columns);
+        onColumnsChange?.(preferences.visible_columns);
+      } else {
+        // Default: all columns visible
+        const allColumns = availableColumns.map((col) => col.id);
+        setSelectedColumns(allColumns);
+        onColumnsChange?.(allColumns);
+      }
+      setInitialized(true);
     }
-  }, [preferences]);
+  }, [preferences, initialized, availableColumns, onColumnsChange]);
 
   const handleToggleColumn = (columnId: string) => {
     const column = availableColumns.find((col) => col.id === columnId);

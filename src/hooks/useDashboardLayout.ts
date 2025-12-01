@@ -127,8 +127,13 @@ export const useDashboardLayout = () => {
     };
 
     console.log('🗑️ New widgets after removal:', newWidgets.map(w => w.id));
-    saveLayoutMutation.mutate(newLayout);
-  }, [savedLayout, saveLayoutMutation]);
+    saveLayoutMutation.mutate(newLayout, {
+      onSuccess: () => {
+        // Força atualização imediata
+        queryClient.invalidateQueries({ queryKey: ['dashboard-layout', user?.id] });
+      }
+    });
+  }, [savedLayout, saveLayoutMutation, queryClient, user?.id]);
 
   return {
     layout: savedLayout || DEFAULT_LAYOUT,
