@@ -19,8 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
-import { Search, Facebook, Chrome, RefreshCw } from 'lucide-react';
-import { ExportReportButton } from '@/components/reports/ExportReportButton';
+import { Search, Facebook, Chrome, RefreshCw, BarChart3, Download } from 'lucide-react';
+import { ExportReportDialog, ExportConfig } from '@/components/reports/ExportReportDialog';
 import { useExportReport } from '@/hooks/useExportReport';
 import { ColumnCustomizer } from '@/components/filters/ColumnCustomizer';
 import { AdAccountFilter } from '@/components/filters/AdAccountFilter';
@@ -28,6 +28,8 @@ import { DateRangePicker } from '@/components/DateRangePicker';
 import { useSyncMetrics } from '@/hooks/useSyncMetrics';
 import { TrendIndicator } from '@/components/TrendIndicator';
 import { subDays } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CampaignAnalytics } from '@/components/campaigns/CampaignAnalytics';
 
 const AVAILABLE_COLUMNS = [
   { id: 'name', label: 'Nome', required: true },
@@ -60,6 +62,8 @@ export default function Campanhas() {
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     AVAILABLE_COLUMNS.map((col) => col.id)
   );
+  const [activeTab, setActiveTab] = useState('campaigns');
+  const [compareDateRange, setCompareDateRange] = useState<{ from: Date; to: Date } | null>(null);
 
   const { data: campaigns, isLoading, refetch } = useCampaignMetrics({
     search,
@@ -108,29 +112,77 @@ export default function Campanhas() {
     refetch();
   };
 
-  const handleExport = async () => {
+  const handleExportConfig = async (config: ExportConfig) => {
     if (!campaigns || campaigns.length === 0) return;
 
-    const totalSpend = campaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
-    const totalBudget = campaigns.reduce((sum, c) => sum + (c.budget || 0), 0);
+    // Filter campaigns by provider if needed
+    const filteredCampaigns = config.provider === 'all' 
+      ? campaigns 
+      : campaigns.filter(c => c.provider === config.provider);
+
+    // Calculate metrics based on selected metrics
+    const metrics: Array<{ label: string; value: string }> = [];
+    
+    if (config.selectedMetrics.impressions) {
+      const total = filteredCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
+      metrics.push({ label: 'Impressões', value: formatNumber(total) });
+    }
+    if (config.selectedMetrics.clicks) {
+      const total = filteredCampaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
+      metrics.push({ label: 'Cliques', value: formatNumber(total) });
+    }
+    if (config.selectedMetrics.ctr) {
+      const totalImpressions = filteredCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
+      const totalClicks = filteredCampaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
+      const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+      metrics.push({ label: 'CTR Médio', value: formatPercentage(avgCTR) });
+    }
+    if (config.selectedMetrics.cpc) {
+      const totalSpend = filteredCampaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
+      const totalClicks = filteredCampaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
+      const avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
+      metrics.push({ label: 'CPC Médio', value: formatCurrency(avgCPC) });
+    }
+    if (config.selectedMetrics.spend) {
+      const total = filteredCampaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
+      metrics.push({ label: 'Gasto Total', value: formatCurrency(total) });
+    }
+    if (config.selectedMetrics.conversions) {
+      const total = filteredCampaigns.reduce((sum, c) => sum + (c.conversions || 0), 0);
+      metrics.push({ label: 'Conversões', value: formatNumber(total) });
+    }
+    if (config.selectedMetrics.results) {
+      const total = filteredCampaigns.reduce((sum, c) => sum + (c.results || 0), 0);
+      metrics.push({ label: 'Resultados', value: formatNumber(total) });
+    }
+    if (config.selectedMetrics.cost_per_result) {
+      const totalSpend = filteredCampaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
+      const totalResults = filteredCampaigns.reduce((sum, c) => sum + (c.results || 0), 0);
+      const avgCostPerResult = totalResults > 0 ? totalSpend / totalResults : 0;
+      metrics.push({ label: 'Custo/Resultado Médio', value: formatCurrency(avgCostPerResult) });
+    }
+    if (config.selectedMetrics.messages) {
+      const total = filteredCampaigns.reduce((sum, c) => sum + (c.messages || 0), 0);
+      metrics.push({ label: 'Mensagens', value: formatNumber(total) });
+    }
+    if (config.selectedMetrics.cost_per_message) {
+      const totalSpend = filteredCampaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
+      const totalMessages = filteredCampaigns.reduce((sum, c) => sum + (c.messages || 0), 0);
+      const avgCostPerMessage = totalMessages > 0 ? totalSpend / totalMessages : 0;
+      metrics.push({ label: 'Custo/Mensagem Médio', value: formatCurrency(avgCostPerMessage) });
+    }
 
     await exportReport({
       title: 'Relatório de Campanhas',
       period: `${dateRange.from.toLocaleDateString('pt-BR')} - ${dateRange.to.toLocaleDateString('pt-BR')}`,
-      metrics: [
-        { label: 'Total de Campanhas', value: `${campaigns.length}` },
-        { label: 'Ativas', value: `${campaigns.filter(c => c.status === 'ACTIVE').length}` },
-        { label: 'Pausadas', value: `${campaigns.filter(c => c.status === 'PAUSED').length}` },
-        { label: 'Gasto Total', value: formatCurrency(totalSpend) },
-        { label: 'Orçamento Total', value: formatCurrency(totalBudget) },
-      ],
-      campaigns: campaigns.map((c) => ({
+      metrics,
+      campaigns: config.includeSections.campaignTable ? filteredCampaigns.map((c) => ({
         name: c.campaign_name,
         provider: c.provider === 'meta' ? 'Meta Ads' : 'Google Ads',
         status: c.status === 'ACTIVE' ? 'Ativa' : c.status === 'PAUSED' ? 'Pausada' : 'Deletada',
         spend: formatCurrency(c.spend),
         budget: formatCurrency(c.budget),
-      })),
+      })) : [],
     });
   };
 
@@ -153,10 +205,9 @@ export default function Campanhas() {
             <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
-          <ExportReportButton
-            onClick={handleExport}
+          <ExportReportDialog
+            onExport={handleExportConfig}
             isLoading={isExporting}
-            label="Exportar"
           />
         </div>
       </div>
@@ -224,14 +275,41 @@ export default function Campanhas() {
                   setDateRange({ from: range.from, to: range.to });
                 }
               }}
-              placeholder="Selecione o período"
+              placeholder="Período principal"
             />
+            {activeTab === 'analytics' && (
+              <DateRangePicker
+                dateRange={compareDateRange || undefined}
+                onDateRangeChange={(range) => {
+                  if (range?.from && range?.to) {
+                    setCompareDateRange({ from: range.from, to: range.to });
+                  } else {
+                    setCompareDateRange(null);
+                  }
+                }}
+                placeholder="Período de comparação (opcional)"
+              />
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Campaigns Table */}
-      <Card>
+      {/* Tabs for Campaigns and Analytics */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="campaigns">
+            <Download className="h-4 w-4 mr-2" />
+            Campanhas
+          </TabsTrigger>
+          <TabsTrigger value="analytics">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Análise Avançada
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="campaigns" className="mt-6">
+          {/* Campaigns Table */}
+          <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>
@@ -366,6 +444,19 @@ export default function Campanhas() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-6">
+          <CampaignAnalytics
+            dateFrom={dateRange.from}
+            dateTo={dateRange.to}
+            compareDateFrom={compareDateRange?.from}
+            compareDateTo={compareDateRange?.to}
+            provider={provider}
+            accountId={accountId}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
