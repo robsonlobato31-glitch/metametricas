@@ -109,11 +109,13 @@ export const WidgetSelector = ({
   const categories = Array.from(new Set(AVAILABLE_WIDGETS.map(w => w.category)));
 
   const isWidgetActive = (widgetType: WidgetType) => {
-    return existingWidgetIds.some(id => id.includes(widgetType));
+    // Procura por um widget que comece com o tipo exato
+    return existingWidgetIds.some(id => id.startsWith(widgetType + '-') || id === widgetType);
   };
 
   const getWidgetId = (widgetType: WidgetType) => {
-    return existingWidgetIds.find(id => id.includes(widgetType)) || '';
+    // Retorna o ID que corresponde exatamente ao tipo
+    return existingWidgetIds.find(id => id.startsWith(widgetType + '-') || id === widgetType) || '';
   };
 
   const handleToggleWidget = (widgetConfig: typeof AVAILABLE_WIDGETS[0], isActive: boolean) => {

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfWeek, endOfWeek, eachDayOfInterval, format } from 'date-fns';
+import { subDays, eachDayOfInterval, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface ChartDataPoint {
@@ -17,10 +17,9 @@ export const useChartData = () => {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Últimos 7 dias
+      // Últimos 7 dias (hoje e os 6 dias anteriores)
       const today = new Date();
-      const weekStart = startOfWeek(today, { locale: ptBR });
-      const weekEnd = endOfWeek(today, { locale: ptBR });
+      const sevenDaysAgo = subDays(today, 6);
       
       // Buscar todas as campanhas do usuário
       const { data: campaigns, error: campaignsError } = await supabase
@@ -33,19 +32,19 @@ export const useChartData = () => {
 
       const campaignIds = campaigns.map(c => c.id);
 
-      // Buscar métricas da semana
+      // Buscar métricas dos últimos 7 dias
       const { data: metrics, error: metricsError } = await supabase
         .from('metrics')
         .select('date, spend, clicks, impressions, conversions')
         .in('campaign_id', campaignIds)
-        .gte('date', format(weekStart, 'yyyy-MM-dd'))
-        .lte('date', format(weekEnd, 'yyyy-MM-dd'))
+        .gte('date', format(sevenDaysAgo, 'yyyy-MM-dd'))
+        .lte('date', format(today, 'yyyy-MM-dd'))
         .order('date');
 
       if (metricsError) throw metricsError;
 
-      // Agrupar por dia da semana
-      const daysOfWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+      // Agrupar por dia
+      const daysOfWeek = eachDayOfInterval({ start: sevenDaysAgo, end: today });
       
       const chartData: ChartDataPoint[] = daysOfWeek.map(day => {
         const dayStr = format(day, 'yyyy-MM-dd');

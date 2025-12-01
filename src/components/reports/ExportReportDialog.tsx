@@ -33,6 +33,18 @@ export interface ExportConfig {
     trendChart: boolean;
     campaignTable: boolean;
   };
+  selectedMetrics: {
+    impressions: boolean;
+    clicks: boolean;
+    ctr: boolean;
+    cpc: boolean;
+    spend: boolean;
+    conversions: boolean;
+    results: boolean;
+    cost_per_result: boolean;
+    messages: boolean;
+    cost_per_message: boolean;
+  };
 }
 
 export const ExportReportDialog = ({ onExport, isLoading }: ExportReportDialogProps) => {
@@ -45,6 +57,18 @@ export const ExportReportDialog = ({ onExport, isLoading }: ExportReportDialogPr
       budgetChart: true,
       trendChart: true,
       campaignTable: true,
+    },
+    selectedMetrics: {
+      impressions: true,
+      clicks: true,
+      ctr: true,
+      cpc: true,
+      spend: true,
+      conversions: true,
+      results: true,
+      cost_per_result: true,
+      messages: true,
+      cost_per_message: true,
     },
   });
 
@@ -185,6 +209,46 @@ export const ExportReportDialog = ({ onExport, isLoading }: ExportReportDialogPr
                   Tabela de Campanhas
                 </label>
               </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            <Label>Métricas a Incluir</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries({
+                impressions: 'Impressões',
+                clicks: 'Cliques',
+                ctr: 'CTR',
+                cpc: 'CPC',
+                spend: 'Gasto',
+                conversions: 'Conversões',
+                results: 'Resultados',
+                cost_per_result: 'Custo/Resultado',
+                messages: 'Mensagens',
+                cost_per_message: 'Custo/Mensagem',
+              }).map(([key, label]) => (
+                <div key={key} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={key}
+                    checked={config.selectedMetrics[key as keyof typeof config.selectedMetrics]}
+                    onCheckedChange={(checked) =>
+                      setConfig({
+                        ...config,
+                        selectedMetrics: { 
+                          ...config.selectedMetrics, 
+                          [key]: !!checked 
+                        },
+                      })
+                    }
+                  />
+                  <label
+                    htmlFor={key}
+                    className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    {label}
+                  </label>
+                </div>
+              ))}
             </div>
           </div>
         </div>

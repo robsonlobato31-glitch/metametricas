@@ -57,7 +57,7 @@ export const useCampaignMetrics = (filters?: CampaignMetricsFilters) => {
           campaignQuery = campaignQuery.eq('ad_accounts.provider', filters.provider);
         }
 
-        if (filters?.status) {
+        if (filters?.status && filters.status !== 'HAD_DELIVERY') {
           campaignQuery = campaignQuery.eq('status', filters.status);
         }
 
@@ -123,7 +123,14 @@ export const useCampaignMetrics = (filters?: CampaignMetricsFilters) => {
         };
       });
 
-      return Promise.all(metricsPromises);
+      const results = await Promise.all(metricsPromises);
+      
+      // Filtrar por "tiveram veiculação" se necessário
+      if (filters?.status === 'HAD_DELIVERY') {
+        return results.filter(c => c.impressions > 0 || c.spend > 0);
+      }
+      
+      return results;
     },
     enabled: !!user?.id,
   });
