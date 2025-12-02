@@ -66,7 +66,17 @@ serve(async (req) => {
       .single();
 
     if (integrationError || !integration) {
-      throw new Error('Integração Meta Ads não encontrada');
+      console.log(`[${logId}] Nenhuma integração Meta Ads ativa encontrada para o usuário`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'no_integration',
+          message: 'Nenhuma integração Meta Ads encontrada. Conecte sua conta Meta Ads primeiro.',
+          accountsSynced: 0,
+          campaignsSynced: 0,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     await supabaseClient.from('sync_logs').insert({

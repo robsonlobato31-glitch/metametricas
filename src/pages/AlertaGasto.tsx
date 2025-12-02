@@ -38,12 +38,26 @@ export default function AlertaGasto() {
     setIsSyncingMeta(true);
     try {
       // Sincronizar campanhas
-      const { error: campaignsError } = await supabase.functions.invoke('sync-meta-campaigns');
+      const { data: campaignsData, error: campaignsError } = await supabase.functions.invoke('sync-meta-campaigns');
       if (campaignsError) throw campaignsError;
+      
+      if (campaignsData?.error === 'no_integration') {
+        toast.error('Nenhuma integração Meta Ads encontrada', {
+          description: 'Conecte sua conta Meta Ads primeiro nas configurações.',
+        });
+        return;
+      }
 
       // Sincronizar métricas
-      const { error: metricsError } = await supabase.functions.invoke('sync-meta-metrics');
+      const { data: metricsData, error: metricsError } = await supabase.functions.invoke('sync-meta-metrics');
       if (metricsError) throw metricsError;
+      
+      if (metricsData?.error === 'no_integration') {
+        toast.error('Nenhuma integração Meta Ads encontrada', {
+          description: 'Conecte sua conta Meta Ads primeiro nas configurações.',
+        });
+        return;
+      }
 
       toast.success('Meta Ads sincronizado com sucesso!');
       refetch();
