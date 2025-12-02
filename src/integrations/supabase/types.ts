@@ -468,6 +468,72 @@ export type Database = {
         }
         Relationships: []
       }
+      spending_alerts: {
+        Row: {
+          ad_account_id: string | null
+          campaign_id: string | null
+          condition: string
+          created_at: string
+          id: string
+          is_active: boolean
+          last_triggered_at: string | null
+          metric_type: string
+          name: string
+          provider: string | null
+          send_email: boolean
+          threshold_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ad_account_id?: string | null
+          campaign_id?: string | null
+          condition?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_triggered_at?: string | null
+          metric_type: string
+          name: string
+          provider?: string | null
+          send_email?: boolean
+          threshold_amount: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ad_account_id?: string | null
+          campaign_id?: string | null
+          condition?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_triggered_at?: string | null
+          metric_type?: string
+          name?: string
+          provider?: string | null
+          send_email?: boolean
+          threshold_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spending_alerts_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spending_alerts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_logs: {
         Row: {
           accounts_synced: number | null
