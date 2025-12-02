@@ -7,6 +7,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper para processar em chunks
+async function processInChunks<T, R>(
+  items: T[],
+  chunkSize: number,
+  processor: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    const chunkResults = await Promise.all(chunk.map(processor));
+    results.push(...chunkResults);
+  }
+  return results;
+}
+
+// Helper para batch upsert
+async function batchUpsert(
+  supabaseClient: any,
+  table: string,
+  data: any[],
+  onConflict: string,
+  batchSize = 100
+) {
+  for (let i = 0; i < data.length; i += batchSize) {
+    const batch = data.slice(i, i + batchSize);
+    await supabaseClient.from(table).upsert(batch, { onConflict });
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -61,9 +90,7 @@ serve(async (req) => {
       if (!meResponse.ok) {
         const errorText = await meResponse.text();
         
-        // Check if it's an expired token error
         if (errorText.includes('Session has expired') || errorText.includes('OAuthException')) {
-          // Mark integration as expired
           await supabaseClient
             .from('integrations')
             .update({ status: 'expired' })
@@ -77,8 +104,6 @@ serve(async (req) => {
 
       const response: any = await meResponse.json();
       allAdAccounts = [...allAdAccounts, ...response.data];
-      
-      // Verificar se há mais páginas
       nextUrl = response.paging?.next || null;
       
       console.log(`[${logId}] Coletadas ${allAdAccounts.length} contas até agora...`);
@@ -89,7 +114,8 @@ serve(async (req) => {
     let accountsSynced = 0;
     let campaignsSynced = 0;
 
-    for (const account of allAdAccounts) {
+    // Processar contas em paralelo (5 por vez)
+    const processAccount = async (account: any) => {
       try {
         const accountId = account.id.replace('act_', '');
 
@@ -109,9 +135,7 @@ serve(async (req) => {
           .select()
           .single();
 
-        accountsSynced++;
-
-        if (!dbAccount) continue;
+        if (!dbAccount) return { accountsSynced: 0, campaignsSynced: 0 };
 
         // Buscar TODAS as campanhas da conta com paginação
         let allCampaigns: any[] = [];
@@ -133,26 +157,37 @@ serve(async (req) => {
 
         console.log(`[${logId}] Encontradas ${allCampaigns.length} campanhas para conta ${account.name}`);
 
-        for (const campaign of allCampaigns) {
-          await supabaseClient.from('campaigns').upsert({
-            ad_account_id: dbAccount.id,
-            campaign_id: campaign.id,
-            name: campaign.name,
-            status: campaign.status,
-            objective: campaign.objective,
-            daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : null,
-            lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : null,
-            start_date: campaign.start_time ? new Date(campaign.start_time).toISOString().split('T')[0] : null,
-            end_date: campaign.stop_time ? new Date(campaign.stop_time).toISOString().split('T')[0] : null,
-          }, {
-            onConflict: 'ad_account_id,campaign_id',
-          });
+        // Preparar campanhas para batch upsert
+        const campaignsBatch = allCampaigns.map(campaign => ({
+          ad_account_id: dbAccount.id,
+          campaign_id: campaign.id,
+          name: campaign.name,
+          status: campaign.status,
+          objective: campaign.objective,
+          daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : null,
+          lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : null,
+          start_date: campaign.start_time ? new Date(campaign.start_time).toISOString().split('T')[0] : null,
+          end_date: campaign.stop_time ? new Date(campaign.stop_time).toISOString().split('T')[0] : null,
+        }));
 
-          campaignsSynced++;
+        // Batch upsert de campanhas (100 por vez)
+        if (campaignsBatch.length > 0) {
+          await batchUpsert(supabaseClient, 'campaigns', campaignsBatch, 'ad_account_id,campaign_id');
         }
+
+        return { accountsSynced: 1, campaignsSynced: allCampaigns.length };
       } catch (error) {
         console.error(`[${logId}] Erro ao sincronizar conta ${account.id}:`, error);
+        return { accountsSynced: 0, campaignsSynced: 0 };
       }
+    };
+
+    // Processar 5 contas em paralelo
+    const results = await processInChunks(allAdAccounts, 5, processAccount);
+    
+    for (const result of results) {
+      accountsSynced += result.accountsSynced;
+      campaignsSynced += result.campaignsSynced;
     }
 
     await supabaseClient.from('sync_logs').update({
@@ -161,6 +196,8 @@ serve(async (req) => {
       accounts_synced: accountsSynced,
       campaigns_synced: campaignsSynced,
     }).eq('id', logId);
+
+    console.log(`[${logId}] Sincronização concluída: ${accountsSynced} contas, ${campaignsSynced} campanhas`);
 
     return new Response(
       JSON.stringify({

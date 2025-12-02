@@ -7,6 +7,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper para processar em chunks
+async function processInChunks<T, R>(
+  items: T[],
+  chunkSize: number,
+  processor: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    const chunkResults = await Promise.all(chunk.map(processor));
+    results.push(...chunkResults);
+  }
+  return results;
+}
+
+// Helper para batch upsert
+async function batchUpsert(
+  supabaseClient: any,
+  table: string,
+  data: any[],
+  onConflict: string,
+  batchSize = 100
+) {
+  for (let i = 0; i < data.length; i += batchSize) {
+    const batch = data.slice(i, i + batchSize);
+    await supabaseClient.from(table).upsert(batch, { onConflict });
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -69,9 +98,12 @@ serve(async (req) => {
     let metricsSynced = 0;
     let errors = 0;
 
-    for (const campaign of campaigns) {
+    // Processar campanha e retornar métricas para batch insert
+    const processCampaign = async (campaign: any): Promise<{ metrics: any[], errors: number }> => {
+      const campaignMetrics: any[] = [];
+      let campaignErrors = 0;
+
       try {
-        // Buscar insights dos últimos 30 dias
         const date30DaysAgo = new Date();
         date30DaysAgo.setDate(date30DaysAgo.getDate() - 30);
         
@@ -88,13 +120,6 @@ serve(async (req) => {
 
           if (insights && insights.length > 0) {
             for (const insight of insights) {
-              // Log para debug: mostrar todas as actions disponíveis
-              if (insight.actions && Array.isArray(insight.actions)) {
-                const actionTypes = insight.actions.map((a: any) => a.action_type);
-                console.log(`📊 Available action_types for ${campaign.name} on ${insight.date_start}:`, actionTypes);
-              }
-              
-              // Processar ações (conversões, mensagens, resultados)
               let conversions = 0;
               let messages = 0;
               let results = 0;
@@ -109,21 +134,12 @@ serve(async (req) => {
                   const value = parseInt(action.value || '0');
                   const actionType = action.action_type;
                   
-                  // CONVERSÕES - Lista expandida de todos os tipos de conversão
                   const conversionTypes = [
-                    'omni_purchase',
-                    'purchase',
-                    'app_custom_event.fb_mobile_purchase',
-                    'offsite_conversion.fb_pixel_purchase',
-                    'offsite_conversion.custom',
-                    'offsite_conversion.fb_pixel_custom',
-                    'onsite_conversion.post_save',
-                    'lead',
-                    'complete_registration',
-                    'omni_complete_registration',
-                    'app_install',
-                    'omni_app_install',
-                    'onsite_web_app_purchase',
+                    'omni_purchase', 'purchase', 'app_custom_event.fb_mobile_purchase',
+                    'offsite_conversion.fb_pixel_purchase', 'offsite_conversion.custom',
+                    'offsite_conversion.fb_pixel_custom', 'onsite_conversion.post_save',
+                    'lead', 'complete_registration', 'omni_complete_registration',
+                    'app_install', 'omni_app_install', 'onsite_web_app_purchase',
                     'onsite_conversion.purchase',
                   ];
                   
@@ -131,35 +147,23 @@ serve(async (req) => {
                     conversions += value;
                   }
                   
-                  // MENSAGENS - Lista expandida para capturar conversas
                   const messageTypes = [
                     'messaging_conversation_started_7d',
                     'onsite_conversion.messaging_conversation_started_7d',
-                    'messaging_first_reply',
-                    'contact',
-                    'contact_total',
-                    'onsite_conversion.messaging_block',
-                    'messaging_user_depth_3_7d',
+                    'messaging_first_reply', 'contact', 'contact_total',
+                    'onsite_conversion.messaging_block', 'messaging_user_depth_3_7d',
                   ];
                   
                   if (messageTypes.some(type => actionType.includes(type))) {
                     messages += value;
                   }
                   
-                  // RESULTADOS - Lista expandida baseada em objetivos comuns
                   const resultTypes = [
-                    'lead_grouped',
-                    'onsite_conversion.lead_grouped',
-                    'offsite_conversion.fb_pixel_lead',
-                    'link_click',
-                    'post_engagement',
-                    'page_engagement',
-                    'post_reaction',
-                    'comment',
-                    'video_view',
-                    'landing_page_view',
-                    'onsite_web_lead',
-                    'offsite_conversion.fb_pixel_view_content',
+                    'lead_grouped', 'onsite_conversion.lead_grouped',
+                    'offsite_conversion.fb_pixel_lead', 'link_click',
+                    'post_engagement', 'page_engagement', 'post_reaction',
+                    'comment', 'video_view', 'landing_page_view',
+                    'onsite_web_lead', 'offsite_conversion.fb_pixel_view_content',
                     'onsite_conversion.messaging_conversation_started_7d',
                   ];
                   
@@ -167,56 +171,42 @@ serve(async (req) => {
                     results += value;
                   }
                   
-                  // Extrair métricas específicas
                   if (actionType === 'link_click') linkClicks += value;
                   if (actionType === 'landing_page_view') pageViews += value;
                   if (actionType === 'initiate_checkout') initiatedCheckout += value;
                 });
                 
-                // FALLBACK: Se não encontramos resultados específicos, usar o primeiro action disponível
                 if (results === 0 && insight.actions.length > 0) {
-                  // Prioridade: conversões > mensagens > primeira action disponível
                   if (conversions > 0) {
                     results = conversions;
-                    console.log(`📊 Using conversions as results: ${results}`);
                   } else if (messages > 0) {
                     results = messages;
-                    console.log(`📊 Using messages as results: ${results}`);
                   } else {
-                    // Pegar a primeira action que não seja impression ou reach
                     const firstAction = insight.actions.find((a: any) => 
                       !['impression', 'reach', 'frequency'].includes(a.action_type)
                     );
                     if (firstAction) {
                       results = parseInt(firstAction.value || '0');
-                      console.log(`📊 Using first action as results: ${firstAction.action_type} = ${results}`);
                     }
                   }
                 }
               }
 
-              // Processar cost_per_action_type
               if (insight.cost_per_action_type && Array.isArray(insight.cost_per_action_type)) {
                 insight.cost_per_action_type.forEach((costAction: any) => {
                   const cost = parseFloat(costAction.value || '0');
                   const actionType = costAction.action_type;
                   
-                  // Custo por resultado
                   const resultCostTypes = [
-                    'lead_grouped',
-                    'onsite_conversion.lead_grouped',
-                    'offsite_conversion.fb_pixel_lead',
-                    'link_click',
-                    'post_engagement',
-                    'page_engagement',
-                    'landing_page_view',
+                    'lead_grouped', 'onsite_conversion.lead_grouped',
+                    'offsite_conversion.fb_pixel_lead', 'link_click',
+                    'post_engagement', 'page_engagement', 'landing_page_view',
                   ];
                   
                   if (resultCostTypes.some(type => actionType.includes(type)) && costPerResult === 0) {
                     costPerResult = cost;
                   }
                   
-                  // Custo por mensagem
                   const messageCostTypes = [
                     'messaging_conversation_started_7d',
                     'onsite_conversion.messaging_conversation_started_7d',
@@ -229,20 +219,15 @@ serve(async (req) => {
                 });
               }
 
-              // CALCULAR custos se não vieram da API
               if (costPerResult === 0 && results > 0 && insight.spend) {
                 costPerResult = parseFloat(insight.spend) / results;
-                console.log(`💰 Calculated cost per result: ${costPerResult.toFixed(2)}`);
               }
 
               if (costPerMessage === 0 && messages > 0 && insight.spend) {
                 costPerMessage = parseFloat(insight.spend) / messages;
-                console.log(`💰 Calculated cost per message: ${costPerMessage.toFixed(2)}`);
               }
-              
-              console.log(`[${logId}] Campanha ${campaign.name} - Data: ${insight.date_start} - Messages: ${messages}, Results: ${results}, Cost/Message: ${costPerMessage}, Cost/Result: ${costPerResult}`);
 
-              const { error: upsertError } = await supabaseClient.from('metrics').upsert({
+              campaignMetrics.push({
                 campaign_id: campaign.id,
                 date: insight.date_start,
                 impressions: parseInt(insight.impressions) || 0,
@@ -259,40 +244,48 @@ serve(async (req) => {
                 messages: messages || 0,
                 cost_per_result: costPerResult || 0,
                 cost_per_message: costPerMessage || 0,
-              }, {
-                onConflict: 'campaign_id,date',
               });
-
-              if (!upsertError) {
-                metricsSynced++;
-              } else {
-                console.error(`[${logId}] Erro ao inserir métrica:`, upsertError);
-                errors++;
-              }
             }
           }
         } else {
           const errorText = await insightsResponse.text();
           
-          // Check if it's an expired token error
           if (errorText.includes('Session has expired') || errorText.includes('OAuthException')) {
-            // Mark integration as expired
             await supabaseClient
               .from('integrations')
               .update({ status: 'expired' })
               .eq('id', integration.id);
             
-            console.error(`[${logId}] Token Meta expirado, marcando integração como expirada`);
             throw new Error('Token de acesso expirado. Por favor, reconecte sua conta Meta Ads.');
           }
           
           console.error(`[${logId}] Erro ao buscar insights da campanha ${campaign.name}:`, errorText);
-          errors++;
+          campaignErrors++;
         }
       } catch (error) {
         console.error(`[${logId}] Erro ao sincronizar métricas da campanha ${campaign.id}:`, error);
-        errors++;
+        campaignErrors++;
       }
+
+      return { metrics: campaignMetrics, errors: campaignErrors };
+    };
+
+    // Processar 10 campanhas em paralelo
+    const results = await processInChunks(campaigns, 10, processCampaign);
+    
+    // Coletar todas as métricas
+    const allMetrics: any[] = [];
+    for (const result of results) {
+      allMetrics.push(...result.metrics);
+      errors += result.errors;
+    }
+
+    console.log(`[${logId}] Total de ${allMetrics.length} métricas coletadas, inserindo em lotes...`);
+
+    // Batch upsert de todas as métricas (100 por vez)
+    if (allMetrics.length > 0) {
+      await batchUpsert(supabaseClient, 'metrics', allMetrics, 'campaign_id,date');
+      metricsSynced = allMetrics.length;
     }
 
     await supabaseClient.from('sync_logs').update({
