@@ -14,6 +14,7 @@ import {
   Megaphone,
   Target,
   Search,
+  Eye,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,7 @@ import { useExportReport } from '@/hooks/useExportReport';
 import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
 import { ExportCharts } from '@/components/reports/ExportCharts';
 import { ReportTemplateSettings } from '@/components/settings/ReportTemplateSettings';
+import { ReportPreview } from '@/components/reports/ReportPreview';
 import type { ExportConfig } from '@/components/reports/ExportReportDialog';
 
 const OBJECTIVE_LABELS: Record<string, string> = {
@@ -107,6 +109,7 @@ const Relatorios = () => {
   const [config, setConfig] = useState<ExportConfig>(DEFAULT_CONFIG);
   const [showCharts, setShowCharts] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
   const [editingTemplate, setEditingTemplate] = useState<SavedReportTemplate | null>(null);
@@ -642,11 +645,19 @@ const Relatorios = () => {
                 }}
               >
                 <Save className="mr-2 h-4 w-4" />
-                Salvar Template
+                Salvar
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setPreviewDialogOpen(true)}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Preview
               </Button>
               <Button className="flex-1" onClick={handleExport} disabled={isExporting}>
                 <Download className="mr-2 h-4 w-4" />
-                {isExporting ? 'Gerando...' : 'Exportar PDF'}
+                {isExporting ? 'Gerando...' : 'Exportar'}
               </Button>
             </div>
           </CardContent>
@@ -760,6 +771,41 @@ const Relatorios = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Preview Dialog */}
+      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Pré-visualização do Relatório</DialogTitle>
+            <DialogDescription>
+              Veja como o relatório PDF ficará antes de exportar.
+            </DialogDescription>
+          </DialogHeader>
+          <ReportPreview
+            config={config}
+            campaigns={filteredCampaigns}
+            metricsData={metricsData?.map(m => ({
+              campaign_id: m.campaign_id,
+              campaign_name: m.campaign_name,
+              spend: m.spend,
+              impressions: m.impressions,
+              clicks: m.clicks,
+              budget: m.budget,
+              results: m.results,
+              messages: m.messages,
+            })) || []}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewDialogOpen(false)}>
+              Fechar
+            </Button>
+            <Button onClick={() => { setPreviewDialogOpen(false); handleExport(); }} disabled={isExporting}>
+              <Download className="mr-2 h-4 w-4" />
+              {isExporting ? 'Gerando...' : 'Exportar PDF'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Hidden charts for PDF export */}
       {showCharts && (
