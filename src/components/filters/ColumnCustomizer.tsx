@@ -114,7 +114,7 @@ export const ColumnCustomizer = ({
   availableColumns,
   onColumnsChange,
 }: ColumnCustomizerProps) => {
-  const { preferences, savePreferences, isSaving } = useColumnPreferences(pageName);
+  const { preferences, savePreferences, isSaving, isLoading } = useColumnPreferences(pageName);
   const {
     presets,
     defaultPreset,
@@ -123,6 +123,7 @@ export const ColumnCustomizer = ({
     deletePreset,
     isCreating,
     isDeleting,
+    isLoading: isLoadingPresets,
   } = useColumnPresets(pageName);
 
   const [open, setOpen] = useState(false);
@@ -145,7 +146,8 @@ export const ColumnCustomizer = ({
   );
 
   useEffect(() => {
-    if (!initialized) {
+    // Only initialize after both preferences and presets have loaded
+    if (!initialized && !isLoading && !isLoadingPresets) {
       const defaultOrder = availableColumns.map((col) => col.id);
       
       if (defaultPreset?.visible_columns && defaultPreset.visible_columns.length > 0) {
@@ -164,7 +166,7 @@ export const ColumnCustomizer = ({
       }
       setInitialized(true);
     }
-  }, [preferences, defaultPreset, initialized, availableColumns, onColumnsChange]);
+  }, [preferences, defaultPreset, initialized, availableColumns, onColumnsChange, isLoading, isLoadingPresets]);
 
   const handleToggleColumn = (columnId: string) => {
     const column = availableColumns.find((col) => col.id === columnId);
