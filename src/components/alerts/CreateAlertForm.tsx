@@ -96,139 +96,140 @@ export const CreateAlertForm = () => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="text-lg">Criar Novo Alerta</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Metric Type */}
-          <div className="space-y-2">
-            <Label>Tipo de Métrica</Label>
-            <Select value={metricType} onValueChange={setMetricType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a métrica" />
-              </SelectTrigger>
-              <SelectContent>
-                {METRIC_TYPES.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Row 1: Tipo de Métrica + Condição */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Tipo de Métrica</Label>
+              <Select value={metricType} onValueChange={setMetricType}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Selecione a métrica" />
+                </SelectTrigger>
+                <SelectContent>
+                  {METRIC_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Condição</Label>
+              <Select value={condition} onValueChange={setCondition}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Selecione a condição" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONDITIONS.map((cond) => (
+                    <SelectItem key={cond.value} value={cond.value}>
+                      {cond.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Condition */}
-          <div className="space-y-2">
-            <Label>Condição</Label>
-            <Select value={condition} onValueChange={setCondition}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a condição" />
-              </SelectTrigger>
-              <SelectContent>
-                {CONDITIONS.map((cond) => (
-                  <SelectItem key={cond.value} value={cond.value}>
-                    {cond.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Row 2: Limite + Plataforma */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Limite (R$)</Label>
+              <Input
+                type="number"
+                placeholder="Ex: 500"
+                value={threshold}
+                onChange={(e) => setThreshold(e.target.value)}
+                min="0"
+                step="0.01"
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Plataforma</Label>
+              <Select value={provider} onValueChange={(v) => {
+                setProvider(v);
+                setAdAccountId('all');
+                setCampaignId('all');
+              }}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Selecione a plataforma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PLATFORMS.map((plat) => (
+                    <SelectItem key={plat.value} value={plat.value}>
+                      {plat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Threshold */}
-          <div className="space-y-2">
-            <Label>Limite (R$)</Label>
-            <Input
-              type="number"
-              placeholder="Ex: 500"
-              value={threshold}
-              onChange={(e) => setThreshold(e.target.value)}
-              min="0"
-              step="0.01"
-            />
+          {/* Row 3: Conta de Anúncios + Campanha */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Conta (opcional)</Label>
+              <Select value={adAccountId} onValueChange={(v) => {
+                setAdAccountId(v);
+                setCampaignId('all');
+              }}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todas as contas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as contas</SelectItem>
+                  {filteredAccounts.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.account_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Campanha (opcional)</Label>
+              <Select value={campaignId} onValueChange={setCampaignId}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todas as campanhas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as campanhas</SelectItem>
+                  {filteredCampaigns.map((camp) => (
+                    <SelectItem key={camp.id} value={camp.id}>
+                      {camp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Platform */}
-          <div className="space-y-2">
-            <Label>Plataforma</Label>
-            <Select value={provider} onValueChange={(v) => {
-              setProvider(v);
-              setAdAccountId('all');
-              setCampaignId('all');
-            }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a plataforma" />
-              </SelectTrigger>
-              <SelectContent>
-                {PLATFORMS.map((plat) => (
-                  <SelectItem key={plat.value} value={plat.value}>
-                    {plat.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Row 4: Email + Botão */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="send-email"
+                checked={sendEmail}
+                onCheckedChange={setSendEmail}
+              />
+              <Label htmlFor="send-email" className="text-sm cursor-pointer">
+                Enviar email
+              </Label>
+            </div>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={createAlert.isPending || !threshold}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              {createAlert.isPending ? 'Criando...' : 'Criar Alerta'}
+            </Button>
           </div>
-
-          {/* Ad Account (optional) */}
-          <div className="space-y-2">
-            <Label>Conta de Anúncios (opcional)</Label>
-            <Select value={adAccountId} onValueChange={(v) => {
-              setAdAccountId(v);
-              setCampaignId('all');
-            }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todas as contas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as contas</SelectItem>
-                {filteredAccounts.map((acc) => (
-                  <SelectItem key={acc.id} value={acc.id}>
-                    {acc.account_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Campaign (optional) */}
-          <div className="space-y-2">
-            <Label>Campanha (opcional)</Label>
-            <Select value={campaignId} onValueChange={setCampaignId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todas as campanhas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as campanhas</SelectItem>
-                {filteredCampaigns.map((camp) => (
-                  <SelectItem key={camp.id} value={camp.id}>
-                    {camp.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Send Email Toggle */}
-          <div className="flex items-center justify-between pt-2">
-            <Label htmlFor="send-email" className="cursor-pointer">
-              Enviar email quando disparar
-            </Label>
-            <Switch
-              id="send-email"
-              checked={sendEmail}
-              onCheckedChange={setSendEmail}
-            />
-          </div>
-
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={createAlert.isPending || !threshold}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            {createAlert.isPending ? 'Criando...' : 'Criar Alerta'}
-          </Button>
         </form>
       </CardContent>
     </Card>
