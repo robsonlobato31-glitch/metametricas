@@ -17,6 +17,8 @@ interface ExportReportOptions {
     budgetChart?: string;
     trendChart?: string;
     platformPieChart?: string;
+    ageChart?: string;
+    genderChart?: string;
   };
   includeSections?: IncludeSections;
   comparisonData?: Array<{

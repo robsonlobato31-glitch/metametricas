@@ -72,6 +72,8 @@ export interface ExportConfig {
     budgetChart: boolean;
     trendChart: boolean;
     platformPieChart: boolean;
+    ageChart: boolean;
+    genderChart: boolean;
     campaignTable: boolean;
     topCampaignsTable: boolean;
   };
@@ -111,6 +113,8 @@ export const ExportReportDialog = ({
       budgetChart: true,
       trendChart: true,
       platformPieChart: true,
+      ageChart: true,
+      genderChart: true,
       campaignTable: true,
       topCampaignsTable: true,
     },
@@ -427,6 +431,8 @@ export const ExportReportDialog = ({
                   { key: 'budgetChart', label: 'Gráfico de Orçamento' },
                   { key: 'trendChart', label: 'Gráfico de Evolução' },
                   { key: 'platformPieChart', label: 'Gráfico de Distribuição (Pizza)' },
+                  { key: 'ageChart', label: 'Gráfico por Faixa Etária' },
+                  { key: 'genderChart', label: 'Gráfico por Gênero' },
                   { key: 'topCampaignsTable', label: 'Principais Campanhas (Detalhada)' },
                   { key: 'campaignTable', label: 'Tabela de Campanhas' },
                 ].map(({ key, label }) => (
