@@ -59,6 +59,7 @@ import { useExportReport } from '@/hooks/useExportReport';
 import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
 import { useMetricComparison } from '@/hooks/useMetricComparison';
 import { usePlatformBreakdown } from '@/hooks/usePlatformBreakdown';
+import { useDemographicBreakdown } from '@/hooks/useDemographicBreakdown';
 import { ExportCharts } from '@/components/reports/ExportCharts';
 import { ReportTemplateSettings } from '@/components/settings/ReportTemplateSettings';
 import { ReportPreview } from '@/components/reports/ReportPreview';
@@ -95,6 +96,8 @@ const DEFAULT_CONFIG: ExportConfig = {
     budgetChart: true,
     trendChart: true,
     platformPieChart: true,
+    ageChart: true,
+    genderChart: true,
     campaignTable: true,
     topCampaignsTable: true,
   },
@@ -130,6 +133,7 @@ const Relatorios = () => {
   const { data: metricsData } = useCampaignMetrics();
   const { comparisonData } = useMetricComparison(parseInt(config.period));
   const { platformData } = usePlatformBreakdown(parseInt(config.period));
+  const { ageData, genderData } = useDemographicBreakdown(parseInt(config.period));
 
   // Get unique objectives from campaigns
   const availableObjectives = useMemo(() => {
@@ -388,6 +392,8 @@ const Relatorios = () => {
         budgetChart: config.includeSections.budgetChart ? 'budget-chart' : undefined,
         trendChart: config.includeSections.trendChart ? 'trend-chart' : undefined,
         platformPieChart: config.includeSections.platformPieChart ? 'platform-pie-chart' : undefined,
+        ageChart: config.includeSections.ageChart ? 'age-chart' : undefined,
+        genderChart: config.includeSections.genderChart ? 'gender-chart' : undefined,
       },
       includeSections: config.includeSections,
       comparisonData: comparisonDataForPdf,
@@ -689,6 +695,8 @@ const Relatorios = () => {
                       { key: 'budgetChart', label: 'Gráfico de Orçamento' },
                       { key: 'trendChart', label: 'Gráfico de Evolução' },
                       { key: 'platformPieChart', label: 'Gráfico de Distribuição (Pizza)' },
+                      { key: 'ageChart', label: 'Gráfico por Faixa Etária' },
+                      { key: 'genderChart', label: 'Gráfico por Gênero' },
                       { key: 'topCampaignsTable', label: 'Principais Campanhas (Detalhada)' },
                       { key: 'campaignTable', label: 'Tabela de Campanhas' },
                     ].map(({ key, label }) => (
@@ -948,6 +956,12 @@ const Relatorios = () => {
           })) || []}
           showBudget={config.includeSections.budgetChart}
           showTrend={config.includeSections.trendChart}
+          platformData={platformData}
+          showPlatformPie={config.includeSections.platformPieChart}
+          ageData={ageData}
+          showAgeChart={config.includeSections.ageChart}
+          genderData={genderData}
+          showGenderChart={config.includeSections.genderChart}
         />
       )}
     </div>

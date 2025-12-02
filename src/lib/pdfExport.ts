@@ -638,6 +638,8 @@ export interface IncludeSections {
   budgetChart: boolean;
   trendChart: boolean;
   platformPieChart?: boolean;
+  ageChart?: boolean;
+  genderChart?: boolean;
   campaignTable: boolean;
   topCampaignsTable?: boolean;
 }
@@ -656,6 +658,8 @@ export const exportCampaignReport = async (
     budgetChart?: string;
     trendChart?: string;
     platformPieChart?: string;
+    ageChart?: string;
+    genderChart?: string;
   },
   template?: {
     logoUrl?: string;
@@ -748,6 +752,16 @@ export const exportCampaignReport = async (
   // Platform pie chart
   if (includeSections?.platformPieChart && chartIds?.platformPieChart) {
     currentY = await addChartImage(doc, chartIds.platformPieChart, 'Distribuição por Plataforma', currentY, primaryColor);
+  }
+
+  // Age chart
+  if (includeSections?.ageChart && chartIds?.ageChart) {
+    currentY = await addChartImage(doc, chartIds.ageChart, 'Distribuição por Faixa Etária', currentY, primaryColor);
+  }
+
+  // Gender chart
+  if (includeSections?.genderChart && chartIds?.genderChart) {
+    currentY = await addChartImage(doc, chartIds.genderChart, 'Distribuição por Gênero', currentY, primaryColor);
   }
 
   // Top campaigns table
