@@ -29,6 +29,15 @@ interface CampaignMetricsFilters {
   accountId?: string;
   dateFrom?: Date;
   dateTo?: Date;
+  objective?: string;
+  budgetMin?: number;
+  budgetMax?: number;
+  ctrMin?: number;
+  ctrMax?: number;
+  cpcMin?: number;
+  cpcMax?: number;
+  costPerResultMin?: number;
+  costPerResultMax?: number;
 }
 
 export const useCampaignMetrics = (filters?: CampaignMetricsFilters) => {
@@ -123,11 +132,48 @@ export const useCampaignMetrics = (filters?: CampaignMetricsFilters) => {
         };
       });
 
-      const results = await Promise.all(metricsPromises);
+      let results = await Promise.all(metricsPromises);
       
       // Filtrar por "tiveram veiculação" se necessário
       if (filters?.status === 'HAD_DELIVERY') {
-        return results.filter(c => c.impressions > 0 || c.spend > 0);
+        results = results.filter(c => c.impressions > 0 || c.spend > 0);
+      }
+
+      // Apply advanced filters
+      if (filters?.objective) {
+        results = results.filter(c => c.objective === filters.objective);
+      }
+
+      if (filters?.budgetMin !== undefined) {
+        results = results.filter(c => (c.budget || 0) >= filters.budgetMin!);
+      }
+
+      if (filters?.budgetMax !== undefined) {
+        results = results.filter(c => (c.budget || 0) <= filters.budgetMax!);
+      }
+
+      if (filters?.ctrMin !== undefined) {
+        results = results.filter(c => c.ctr >= filters.ctrMin!);
+      }
+
+      if (filters?.ctrMax !== undefined) {
+        results = results.filter(c => c.ctr <= filters.ctrMax!);
+      }
+
+      if (filters?.cpcMin !== undefined) {
+        results = results.filter(c => c.cpc >= filters.cpcMin!);
+      }
+
+      if (filters?.cpcMax !== undefined) {
+        results = results.filter(c => c.cpc <= filters.cpcMax!);
+      }
+
+      if (filters?.costPerResultMin !== undefined) {
+        results = results.filter(c => c.cost_per_result >= filters.costPerResultMin!);
+      }
+
+      if (filters?.costPerResultMax !== undefined) {
+        results = results.filter(c => c.cost_per_result <= filters.costPerResultMax!);
       }
       
       return results;

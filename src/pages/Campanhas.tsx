@@ -24,6 +24,7 @@ import { ExportReportDialog, ExportConfig } from '@/components/reports/ExportRep
 import { useExportReport } from '@/hooks/useExportReport';
 import { ColumnCustomizer } from '@/components/filters/ColumnCustomizer';
 import { AdAccountFilter } from '@/components/filters/AdAccountFilter';
+import { AdvancedFilters, AdvancedFiltersConfig } from '@/components/filters/AdvancedFilters';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useSyncMetrics } from '@/hooks/useSyncMetrics';
 import { TrendIndicator } from '@/components/TrendIndicator';
@@ -64,6 +65,7 @@ export default function Campanhas() {
   );
   const [activeTab, setActiveTab] = useState('campaigns');
   const [compareDateRange, setCompareDateRange] = useState<{ from: Date; to: Date } | null>(null);
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersConfig>({});
 
   const { data: campaigns, isLoading, refetch } = useCampaignMetrics({
     search,
@@ -72,6 +74,7 @@ export default function Campanhas() {
     accountId,
     dateFrom: dateRange.from,
     dateTo: dateRange.to,
+    ...advancedFilters,
   });
 
   const { exportReport, isExporting } = useExportReport();
@@ -234,6 +237,11 @@ export default function Campanhas() {
               value={accountId}
               onChange={setAccountId}
               provider={provider}
+            />
+
+            <AdvancedFilters
+              filters={advancedFilters}
+              onChange={setAdvancedFilters}
             />
 
             <Select
