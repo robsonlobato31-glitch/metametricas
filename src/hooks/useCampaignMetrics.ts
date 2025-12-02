@@ -6,6 +6,7 @@ interface CampaignMetrics {
   campaign_id: string;
   campaign_name: string;
   account_name: string;
+  ad_account_id: string;
   provider: string;
   status: string;
   objective: string | null;
@@ -115,6 +116,7 @@ export const useCampaignMetrics = (filters?: CampaignMetricsFilters) => {
           campaign_id: campaign.id,
           campaign_name: campaign.name,
           account_name: campaign.ad_accounts.account_name,
+          ad_account_id: campaign.ad_accounts.id,
           provider: campaign.ad_accounts.provider,
           status: campaign.status,
           objective: campaign.objective,

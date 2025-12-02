@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Calendar, Download } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Calendar, Download, Building2, Megaphone } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,15 +18,32 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+interface AdAccount {
+  id: string;
+  name: string;
+  provider: string;
+}
+
+interface Campaign {
+  id: string;
+  name: string;
+  accountId?: string;
+}
 
 interface ExportReportDialogProps {
   onExport: (config: ExportConfig) => void;
   isLoading?: boolean;
+  availableAccounts?: AdAccount[];
+  availableCampaigns?: Campaign[];
 }
 
 export interface ExportConfig {
   period: '7' | '30' | '90';
   provider: 'all' | 'meta' | 'google';
+  selectedAccountIds: string[];
+  selectedCampaignIds: string[];
   includeSections: {
     metrics: boolean;
     budgetChart: boolean;
@@ -47,11 +64,18 @@ export interface ExportConfig {
   };
 }
 
-export const ExportReportDialog = ({ onExport, isLoading }: ExportReportDialogProps) => {
+export const ExportReportDialog = ({
+  onExport,
+  isLoading,
+  availableAccounts = [],
+  availableCampaigns = [],
+}: ExportReportDialogProps) => {
   const [open, setOpen] = useState(false);
   const [config, setConfig] = useState<ExportConfig>({
     period: '30',
     provider: 'all',
+    selectedAccountIds: [],
+    selectedCampaignIds: [],
     includeSections: {
       metrics: true,
       budgetChart: true,
@@ -72,6 +96,72 @@ export const ExportReportDialog = ({ onExport, isLoading }: ExportReportDialogPr
     },
   });
 
+  // Filter accounts by provider
+  const filteredAccounts = useMemo(() => {
+    if (config.provider === 'all') return availableAccounts;
+    return availableAccounts.filter((a) => a.provider === config.provider);
+  }, [availableAccounts, config.provider]);
+
+  // Filter campaigns by selected accounts and provider
+  const filteredCampaigns = useMemo(() => {
+    let filtered = availableCampaigns;
+    if (config.selectedAccountIds.length > 0) {
+      filtered = filtered.filter((c) =>
+        config.selectedAccountIds.includes(c.accountId || '')
+      );
+    }
+    return filtered;
+  }, [availableCampaigns, config.selectedAccountIds]);
+
+  const handleAccountToggle = (accountId: string) => {
+    setConfig((prev) => {
+      const isSelected = prev.selectedAccountIds.includes(accountId);
+      const newAccountIds = isSelected
+        ? prev.selectedAccountIds.filter((id) => id !== accountId)
+        : [...prev.selectedAccountIds, accountId];
+      
+      // Reset campaign selection when accounts change
+      return {
+        ...prev,
+        selectedAccountIds: newAccountIds,
+        selectedCampaignIds: [],
+      };
+    });
+  };
+
+  const handleCampaignToggle = (campaignId: string) => {
+    setConfig((prev) => {
+      const isSelected = prev.selectedCampaignIds.includes(campaignId);
+      return {
+        ...prev,
+        selectedCampaignIds: isSelected
+          ? prev.selectedCampaignIds.filter((id) => id !== campaignId)
+          : [...prev.selectedCampaignIds, campaignId],
+      };
+    });
+  };
+
+  const handleSelectAllAccounts = () => {
+    setConfig((prev) => ({
+      ...prev,
+      selectedAccountIds:
+        prev.selectedAccountIds.length === filteredAccounts.length
+          ? []
+          : filteredAccounts.map((a) => a.id),
+      selectedCampaignIds: [],
+    }));
+  };
+
+  const handleSelectAllCampaigns = () => {
+    setConfig((prev) => ({
+      ...prev,
+      selectedCampaignIds:
+        prev.selectedCampaignIds.length === filteredCampaigns.length
+          ? []
+          : filteredCampaigns.map((c) => c.id),
+    }));
+  };
+
   const handleExport = () => {
     onExport(config);
     setOpen(false);
@@ -85,174 +175,281 @@ export const ExportReportDialog = ({ onExport, isLoading }: ExportReportDialogPr
           Exportar Relatório
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Configurar Relatório PDF</DialogTitle>
           <DialogDescription>
             Escolha as opções para personalizar seu relatório.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="period">
-              <Calendar className="inline mr-2 h-4 w-4" />
-              Período
-            </Label>
-            <Select
-              value={config.period}
-              onValueChange={(value: '7' | '30' | '90') =>
-                setConfig({ ...config, period: value })
-              }
-            >
-              <SelectTrigger id="period">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Últimos 7 dias</SelectItem>
-                <SelectItem value="30">Últimos 30 dias</SelectItem>
-                <SelectItem value="90">Últimos 90 dias</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="provider">Plataforma</Label>
-            <Select
-              value={config.provider}
-              onValueChange={(value: 'all' | 'meta' | 'google') =>
-                setConfig({ ...config, provider: value })
-              }
-            >
-              <SelectTrigger id="provider">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="meta">Meta Ads</SelectItem>
-                <SelectItem value="google">Google Ads</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-3">
-            <Label>Seções a Incluir</Label>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="metrics"
-                  checked={config.includeSections.metrics}
-                  onCheckedChange={(checked) =>
-                    setConfig({
-                      ...config,
-                      includeSections: { ...config.includeSections, metrics: !!checked },
-                    })
-                  }
-                />
-                <label
-                  htmlFor="metrics"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Resumo de Métricas
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="budgetChart"
-                  checked={config.includeSections.budgetChart}
-                  onCheckedChange={(checked) =>
-                    setConfig({
-                      ...config,
-                      includeSections: { ...config.includeSections, budgetChart: !!checked },
-                    })
-                  }
-                />
-                <label
-                  htmlFor="budgetChart"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Gráfico de Orçamento
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="trendChart"
-                  checked={config.includeSections.trendChart}
-                  onCheckedChange={(checked) =>
-                    setConfig({
-                      ...config,
-                      includeSections: { ...config.includeSections, trendChart: !!checked },
-                    })
-                  }
-                />
-                <label
-                  htmlFor="trendChart"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Gráfico de Evolução
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="campaignTable"
-                  checked={config.includeSections.campaignTable}
-                  onCheckedChange={(checked) =>
-                    setConfig({
-                      ...config,
-                      includeSections: { ...config.includeSections, campaignTable: !!checked },
-                    })
-                  }
-                />
-                <label
-                  htmlFor="campaignTable"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Tabela de Campanhas
-                </label>
-              </div>
+        <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="period">
+                <Calendar className="inline mr-2 h-4 w-4" />
+                Período
+              </Label>
+              <Select
+                value={config.period}
+                onValueChange={(value: '7' | '30' | '90') =>
+                  setConfig({ ...config, period: value })
+                }
+              >
+                <SelectTrigger id="period">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Últimos 7 dias</SelectItem>
+                  <SelectItem value="30">Últimos 30 dias</SelectItem>
+                  <SelectItem value="90">Últimos 90 dias</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </div>
 
-          <div className="grid gap-3">
-            <Label>Métricas a Incluir</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries({
-                impressions: 'Impressões',
-                clicks: 'Cliques',
-                ctr: 'CTR',
-                cpc: 'CPC',
-                spend: 'Gasto',
-                conversions: 'Conversões',
-                results: 'Resultados',
-                cost_per_result: 'Custo/Resultado',
-                messages: 'Mensagens',
-                cost_per_message: 'Custo/Mensagem',
-              }).map(([key, label]) => (
-                <div key={key} className="flex items-center space-x-2">
+            <div className="grid gap-2">
+              <Label htmlFor="provider">Plataforma</Label>
+              <Select
+                value={config.provider}
+                onValueChange={(value: 'all' | 'meta' | 'google') =>
+                  setConfig({
+                    ...config,
+                    provider: value,
+                    selectedAccountIds: [],
+                    selectedCampaignIds: [],
+                  })
+                }
+              >
+                <SelectTrigger id="provider">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="meta">Meta Ads</SelectItem>
+                  <SelectItem value="google">Google Ads</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Account Selection */}
+            {filteredAccounts.length > 0 && (
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label>
+                    <Building2 className="inline mr-2 h-4 w-4" />
+                    Contas ({config.selectedAccountIds.length === 0 ? 'Todas' : config.selectedAccountIds.length})
+                  </Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={handleSelectAllAccounts}
+                  >
+                    {config.selectedAccountIds.length === filteredAccounts.length
+                      ? 'Desmarcar todas'
+                      : 'Selecionar todas'}
+                  </Button>
+                </div>
+                <div className="border rounded-md p-2 max-h-[120px] overflow-y-auto space-y-1">
+                  {filteredAccounts.map((account) => (
+                    <div
+                      key={account.id}
+                      className="flex items-center space-x-2 py-1"
+                    >
+                      <Checkbox
+                        id={`account-${account.id}`}
+                        checked={config.selectedAccountIds.includes(account.id)}
+                        onCheckedChange={() => handleAccountToggle(account.id)}
+                      />
+                      <label
+                        htmlFor={`account-${account.id}`}
+                        className="text-sm font-medium leading-none cursor-pointer truncate flex-1"
+                      >
+                        {account.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Campaign Selection */}
+            {filteredCampaigns.length > 0 && (
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label>
+                    <Megaphone className="inline mr-2 h-4 w-4" />
+                    Campanhas ({config.selectedCampaignIds.length === 0 ? 'Todas' : config.selectedCampaignIds.length})
+                  </Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={handleSelectAllCampaigns}
+                  >
+                    {config.selectedCampaignIds.length === filteredCampaigns.length
+                      ? 'Desmarcar todas'
+                      : 'Selecionar todas'}
+                  </Button>
+                </div>
+                <div className="border rounded-md p-2 max-h-[120px] overflow-y-auto space-y-1">
+                  {filteredCampaigns.map((campaign) => (
+                    <div
+                      key={campaign.id}
+                      className="flex items-center space-x-2 py-1"
+                    >
+                      <Checkbox
+                        id={`campaign-${campaign.id}`}
+                        checked={config.selectedCampaignIds.includes(campaign.id)}
+                        onCheckedChange={() => handleCampaignToggle(campaign.id)}
+                      />
+                      <label
+                        htmlFor={`campaign-${campaign.id}`}
+                        className="text-sm font-medium leading-none cursor-pointer truncate flex-1"
+                      >
+                        {campaign.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-3">
+              <Label>Seções a Incluir</Label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
                   <Checkbox
-                    id={key}
-                    checked={config.selectedMetrics[key as keyof typeof config.selectedMetrics]}
+                    id="metrics"
+                    checked={config.includeSections.metrics}
                     onCheckedChange={(checked) =>
                       setConfig({
                         ...config,
-                        selectedMetrics: { 
-                          ...config.selectedMetrics, 
-                          [key]: !!checked 
+                        includeSections: {
+                          ...config.includeSections,
+                          metrics: !!checked,
                         },
                       })
                     }
                   />
                   <label
-                    htmlFor={key}
-                    className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    htmlFor="metrics"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   >
-                    {label}
+                    Resumo de Métricas
                   </label>
                 </div>
-              ))}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="budgetChart"
+                    checked={config.includeSections.budgetChart}
+                    onCheckedChange={(checked) =>
+                      setConfig({
+                        ...config,
+                        includeSections: {
+                          ...config.includeSections,
+                          budgetChart: !!checked,
+                        },
+                      })
+                    }
+                  />
+                  <label
+                    htmlFor="budgetChart"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Gráfico de Orçamento
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="trendChart"
+                    checked={config.includeSections.trendChart}
+                    onCheckedChange={(checked) =>
+                      setConfig({
+                        ...config,
+                        includeSections: {
+                          ...config.includeSections,
+                          trendChart: !!checked,
+                        },
+                      })
+                    }
+                  />
+                  <label
+                    htmlFor="trendChart"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Gráfico de Evolução
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="campaignTable"
+                    checked={config.includeSections.campaignTable}
+                    onCheckedChange={(checked) =>
+                      setConfig({
+                        ...config,
+                        includeSections: {
+                          ...config.includeSections,
+                          campaignTable: !!checked,
+                        },
+                      })
+                    }
+                  />
+                  <label
+                    htmlFor="campaignTable"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Tabela de Campanhas
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              <Label>Métricas a Incluir</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries({
+                  impressions: 'Impressões',
+                  clicks: 'Cliques',
+                  ctr: 'CTR',
+                  cpc: 'CPC',
+                  spend: 'Gasto',
+                  conversions: 'Conversões',
+                  results: 'Resultados',
+                  cost_per_result: 'Custo/Resultado',
+                  messages: 'Mensagens',
+                  cost_per_message: 'Custo/Mensagem',
+                }).map(([key, label]) => (
+                  <div key={key} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={key}
+                      checked={
+                        config.selectedMetrics[
+                          key as keyof typeof config.selectedMetrics
+                        ]
+                      }
+                      onCheckedChange={(checked) =>
+                        setConfig({
+                          ...config,
+                          selectedMetrics: {
+                            ...config.selectedMetrics,
+                            [key]: !!checked,
+                          },
+                        })
+                      }
+                    />
+                    <label
+                      htmlFor={key}
+                      className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      {label}
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex justify-end">
+        </ScrollArea>
+        <div className="flex justify-end pt-4 border-t">
           <Button onClick={handleExport} disabled={isLoading}>
             {isLoading ? 'Gerando...' : 'Gerar PDF'}
           </Button>
