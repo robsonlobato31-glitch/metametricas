@@ -590,6 +590,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_column_presets: {
+        Row: {
+          column_order: string[] | null
+          created_at: string
+          id: string
+          is_default: boolean | null
+          page_name: string
+          preset_name: string
+          updated_at: string
+          user_id: string
+          visible_columns: string[]
+        }
+        Insert: {
+          column_order?: string[] | null
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          page_name: string
+          preset_name: string
+          updated_at?: string
+          user_id: string
+          visible_columns?: string[]
+        }
+        Update: {
+          column_order?: string[] | null
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          page_name?: string
+          preset_name?: string
+          updated_at?: string
+          user_id?: string
+          visible_columns?: string[]
+        }
+        Relationships: []
+      }
       user_onboarding: {
         Row: {
           completed_at: string | null
