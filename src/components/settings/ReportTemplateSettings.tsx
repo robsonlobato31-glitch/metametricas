@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,11 +13,23 @@ export const ReportTemplateSettings = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
-    primary_color: template?.primary_color || '#3B82F6',
-    secondary_color: template?.secondary_color || '#64748B',
-    header_text: template?.header_text || 'Relatório de Campanhas',
-    footer_text: template?.footer_text || '',
+    primary_color: '#3B82F6',
+    secondary_color: '#64748B',
+    header_text: 'Relatório de Campanhas',
+    footer_text: '',
   });
+
+  // Sync form state when template loads
+  useEffect(() => {
+    if (template) {
+      setFormData({
+        primary_color: template.primary_color || '#3B82F6',
+        secondary_color: template.secondary_color || '#64748B',
+        header_text: template.header_text || 'Relatório de Campanhas',
+        footer_text: template.footer_text || '',
+      });
+    }
+  }, [template]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
