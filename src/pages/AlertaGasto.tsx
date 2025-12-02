@@ -225,6 +225,7 @@ export default function AlertaGasto() {
                   const dailyBudget = alert.campaigns.daily_budget || alert.threshold_amount;
                   const monthlyBudget = dailyBudget * 30;
                   const accountName = alert.campaigns.ad_accounts?.account_name || 'Conta não identificada';
+                  const actualPercentage = monthlyBudget > 0 ? (alert.current_amount / monthlyBudget) * 100 : 0;
                   
                   return (
                     <div
@@ -240,7 +241,7 @@ export default function AlertaGasto() {
                           variant="destructive" 
                           className="text-[10px] px-1.5 py-0 whitespace-nowrap"
                         >
-                          {alert.percentage.toFixed(1)}%
+                          {actualPercentage.toFixed(1)}%
                         </Badge>
                       </div>
 
@@ -261,7 +262,7 @@ export default function AlertaGasto() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Gasto Atual:</span>
-                          <span className={`font-medium ${getStatusColor(alert.percentage)}`}>
+                          <span className={`font-medium ${getStatusColor(actualPercentage)}`}>
                             {formatCurrency(alert.current_amount)}
                           </span>
                         </div>
@@ -271,25 +272,25 @@ export default function AlertaGasto() {
                       <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                         <div
                           className={`h-full transition-all ${
-                            alert.percentage >= 100
+                            actualPercentage >= 100
                               ? 'bg-destructive'
-                              : alert.percentage >= 95
+                              : actualPercentage >= 95
                               ? 'bg-destructive'
-                              : alert.percentage >= 80
+                              : actualPercentage >= 80
                               ? 'bg-yellow-500'
                               : 'bg-primary'
                           }`}
-                          style={{ width: `${Math.min(alert.percentage, 100)}%` }}
+                          style={{ width: `${Math.min(actualPercentage, 100)}%` }}
                         />
                       </div>
 
                       {/* Status message */}
-                      {alert.percentage >= 100 ? (
+                      {actualPercentage >= 100 ? (
                         <div className="flex items-center gap-1 text-xs text-destructive">
                           <AlertTriangle className="h-3 w-3" />
                           <span>Orçamento excedido: {formatCurrency(alert.current_amount - monthlyBudget)}</span>
                         </div>
-                      ) : alert.percentage >= 80 && (
+                      ) : actualPercentage >= 80 && (
                         <div className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500">
                           <AlertTriangle className="h-3 w-3" />
                           <span>Seu gasto atingiu 80% do orçamento</span>
