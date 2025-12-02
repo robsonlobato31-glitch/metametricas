@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, RefreshCw, ChevronDown, Loader2 } from 'lucide-react';
+import { AlertTriangle, RefreshCw, ChevronDown, Loader2, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCampaignAlerts } from '@/hooks/useCampaignAlerts';
 import { useRealtimeAlertsContext } from '@/contexts/RealtimeAlertsContext';
@@ -27,6 +27,7 @@ export default function AlertaGasto() {
   const { clearNewAlertsCount } = useRealtimeAlertsContext();
   const [isSyncingMeta, setIsSyncingMeta] = useState(false);
   const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
+  const [isMonitoring, setIsMonitoring] = useState(false);
 
   // Clear new alerts count when component mounts
   useEffect(() => {
@@ -73,6 +74,23 @@ export default function AlertaGasto() {
     }
   };
 
+  const handleMonitorBudgets = async () => {
+    setIsMonitoring(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('monitor-campaign-budgets');
+      if (error) throw error;
+
+      toast.success('Alertas Atualizados', {
+        description: `${data.campaigns_checked} campanhas verificadas. ${data.alerts_updated || 0} alertas atualizados.`,
+      });
+      refetch();
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao verificar orçamentos');
+    } finally {
+      setIsMonitoring(false);
+    }
+  };
+
   const getStatusColor = (percentage: number) => {
     if (percentage >= 95) return 'text-destructive';
     if (percentage >= 80) return 'text-yellow-500';
@@ -86,7 +104,7 @@ export default function AlertaGasto() {
     }).format(value);
   };
 
-  const isSyncing = isSyncingMeta || isSyncingGoogle;
+  const isSyncing = isSyncingMeta || isSyncingGoogle || isMonitoring;
 
   return (
     <div className="space-y-6">
@@ -117,6 +135,14 @@ export default function AlertaGasto() {
                 <DropdownMenuItem onClick={() => refetch()} disabled={isLoading}>
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Atualizar do banco
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleMonitorBudgets} disabled={isMonitoring}>
+                  {isMonitoring ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Shield className="mr-2 h-4 w-4" />
+                  )}
+                  Atualizar Alertas Ativos
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Sincronizar Plataformas</DropdownMenuLabel>
