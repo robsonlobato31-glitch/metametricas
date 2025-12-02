@@ -48,18 +48,30 @@ Deno.serve(async (req) => {
     console.log(`📊 Found ${campaigns?.length || 0} active campaigns with budgets`);
 
     if (!campaigns || campaigns.length === 0) {
+      // Even with no campaigns, update existing alerts
+      const { error: updateAllError } = await supabase
+        .from('campaign_alerts')
+        .update({ current_amount: 0 })
+        .eq('is_active', true);
+      
+      if (updateAllError) {
+        console.error('Error updating alerts:', updateAllError);
+      }
+
       return new Response(
         JSON.stringify({ 
           success: true, 
           message: 'No active campaigns with budgets found',
           campaigns_checked: 0,
-          alerts_created: 0
+          alerts_created: 0,
+          alerts_updated: 0
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     let alertsCreated = 0;
+    let alertsUpdated = 0;
     const thresholds = [80, 90, 100]; // Percentages to check
 
     // Process each campaign
@@ -88,7 +100,29 @@ Deno.serve(async (req) => {
       const percentage = (currentSpend / budget) * 100;
       console.log(`💰 Campaign spend: ${currentSpend.toFixed(2)} / ${budget} (${percentage.toFixed(1)}%)`);
 
-      // Check each threshold
+      // UPDATE: Update current_amount for ALL existing active alerts of this campaign
+      const { data: existingCampaignAlerts, error: existingAlertsError } = await supabase
+        .from('campaign_alerts')
+        .select('id')
+        .eq('campaign_id', campaign.id)
+        .eq('is_active', true);
+
+      if (!existingAlertsError && existingCampaignAlerts && existingCampaignAlerts.length > 0) {
+        const { error: updateError } = await supabase
+          .from('campaign_alerts')
+          .update({ current_amount: currentSpend })
+          .eq('campaign_id', campaign.id)
+          .eq('is_active', true);
+
+        if (updateError) {
+          console.error(`Error updating alerts for campaign ${campaign.id}:`, updateError);
+        } else {
+          alertsUpdated += existingCampaignAlerts.length;
+          console.log(`🔄 Updated ${existingCampaignAlerts.length} existing alerts with current spend: ${currentSpend.toFixed(2)}`);
+        }
+      }
+
+      // Check each threshold for creating NEW alerts
       for (const threshold of thresholds) {
         if (percentage >= threshold) {
           console.log(`⚠️ Campaign reached ${threshold}% threshold`);
@@ -107,7 +141,7 @@ Deno.serve(async (req) => {
           }
 
           if (existingAlerts && existingAlerts.length > 0) {
-            console.log(`ℹ️ Alert already exists for ${threshold}% threshold, skipping...`);
+            console.log(`ℹ️ Alert already exists for ${threshold}% threshold, skipping creation...`);
             continue;
           }
 
@@ -134,7 +168,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`\n🎉 Budget monitoring completed. Created ${alertsCreated} new alerts.`);
+    console.log(`\n🎉 Budget monitoring completed. Created ${alertsCreated} new alerts, updated ${alertsUpdated} existing alerts.`);
 
     return new Response(
       JSON.stringify({
@@ -142,6 +176,7 @@ Deno.serve(async (req) => {
         message: 'Budget monitoring completed',
         campaigns_checked: campaigns.length,
         alerts_created: alertsCreated,
+        alerts_updated: alertsUpdated,
         timestamp: new Date().toISOString(),
       }),
       { 
