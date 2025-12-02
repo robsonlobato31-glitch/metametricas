@@ -6,7 +6,7 @@ import { useReportTemplate } from './useReportTemplate';
 interface ExportReportOptions {
   title: string;
   period: string;
-  metrics: Array<{ label: string; value: string }>;
+  metrics: Array<{ label: string; value: string; variation?: number; isPositive?: boolean }>;
   campaigns: Array<{
     name: string;
     provider: string;
@@ -16,8 +16,34 @@ interface ExportReportOptions {
   chartIds?: {
     budgetChart?: string;
     trendChart?: string;
+    platformPieChart?: string;
   };
   includeSections?: IncludeSections;
+  comparisonData?: Array<{
+    label: string;
+    current: number;
+    previous: number;
+    format?: 'currency' | 'number' | 'percent';
+  }>;
+  platformData?: Array<{
+    provider: string;
+    impressions: number;
+    clicks: number;
+    spend: number;
+    cpc: number;
+    results: number;
+    costPerResult: number;
+  }>;
+  topCampaigns?: Array<{
+    name: string;
+    provider: string;
+    impressions: number;
+    clicks: number;
+    cpc: number;
+    results: number;
+    costPerResult: number;
+    spend: number;
+  }>;
 }
 
 export const useExportReport = () => {
@@ -40,7 +66,12 @@ export const useExportReport = () => {
           headerText: template.header_text,
           footerText: template.footer_text || undefined,
         } : undefined,
-        options.includeSections
+        options.includeSections,
+        {
+          comparisonData: options.comparisonData,
+          platformData: options.platformData,
+          topCampaigns: options.topCampaigns,
+        }
       );
       toast({
         title: 'Relatório exportado',

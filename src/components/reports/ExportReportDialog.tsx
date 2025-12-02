@@ -65,10 +65,15 @@ export interface ExportConfig {
   selectedCampaignIds: string[];
   selectedObjectives: string[];
   includeSections: {
+    coverPage: boolean;
     metrics: boolean;
+    metricsComparison: boolean;
+    platformBreakdown: boolean;
     budgetChart: boolean;
     trendChart: boolean;
+    platformPieChart: boolean;
     campaignTable: boolean;
+    topCampaignsTable: boolean;
   };
   selectedMetrics: {
     impressions: boolean;
@@ -99,10 +104,15 @@ export const ExportReportDialog = ({
     selectedCampaignIds: [],
     selectedObjectives: [],
     includeSections: {
+      coverPage: true,
       metrics: true,
+      metricsComparison: true,
+      platformBreakdown: true,
       budgetChart: true,
       trendChart: true,
+      platformPieChart: true,
       campaignTable: true,
+      topCampaignsTable: true,
     },
     selectedMetrics: {
       impressions: true,
@@ -171,7 +181,6 @@ export const ExportReportDialog = ({
         ? prev.selectedAccountIds.filter((id) => id !== accountId)
         : [...prev.selectedAccountIds, accountId];
       
-      // Reset campaign selection when accounts change
       return {
         ...prev,
         selectedAccountIds: newAccountIds,
@@ -410,90 +419,39 @@ export const ExportReportDialog = ({
             <div className="grid gap-3">
               <Label>Seções a Incluir</Label>
               <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="metrics"
-                    checked={config.includeSections.metrics}
-                    onCheckedChange={(checked) =>
-                      setConfig({
-                        ...config,
-                        includeSections: {
-                          ...config.includeSections,
-                          metrics: !!checked,
-                        },
-                      })
-                    }
-                  />
-                  <label
-                    htmlFor="metrics"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Resumo de Métricas
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="budgetChart"
-                    checked={config.includeSections.budgetChart}
-                    onCheckedChange={(checked) =>
-                      setConfig({
-                        ...config,
-                        includeSections: {
-                          ...config.includeSections,
-                          budgetChart: !!checked,
-                        },
-                      })
-                    }
-                  />
-                  <label
-                    htmlFor="budgetChart"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Gráfico de Orçamento
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="trendChart"
-                    checked={config.includeSections.trendChart}
-                    onCheckedChange={(checked) =>
-                      setConfig({
-                        ...config,
-                        includeSections: {
-                          ...config.includeSections,
-                          trendChart: !!checked,
-                        },
-                      })
-                    }
-                  />
-                  <label
-                    htmlFor="trendChart"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Gráfico de Evolução
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="campaignTable"
-                    checked={config.includeSections.campaignTable}
-                    onCheckedChange={(checked) =>
-                      setConfig({
-                        ...config,
-                        includeSections: {
-                          ...config.includeSections,
-                          campaignTable: !!checked,
-                        },
-                      })
-                    }
-                  />
-                  <label
-                    htmlFor="campaignTable"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Tabela de Campanhas
-                  </label>
-                </div>
+                {[
+                  { key: 'coverPage', label: 'Página de Capa' },
+                  { key: 'metrics', label: 'Resumo de Métricas' },
+                  { key: 'metricsComparison', label: 'Comparativo com Período Anterior' },
+                  { key: 'platformBreakdown', label: 'Resultados por Plataforma' },
+                  { key: 'budgetChart', label: 'Gráfico de Orçamento' },
+                  { key: 'trendChart', label: 'Gráfico de Evolução' },
+                  { key: 'platformPieChart', label: 'Gráfico de Distribuição (Pizza)' },
+                  { key: 'topCampaignsTable', label: 'Principais Campanhas (Detalhada)' },
+                  { key: 'campaignTable', label: 'Tabela de Campanhas' },
+                ].map(({ key, label }) => (
+                  <div key={key} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={key}
+                      checked={config.includeSections[key as keyof typeof config.includeSections]}
+                      onCheckedChange={(checked) =>
+                        setConfig({
+                          ...config,
+                          includeSections: {
+                            ...config.includeSections,
+                            [key]: !!checked,
+                          },
+                        })
+                      }
+                    />
+                    <label
+                      htmlFor={key}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {label}
+                    </label>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -514,12 +472,8 @@ export const ExportReportDialog = ({
                 }).map(([key, label]) => (
                   <div key={key} className="flex items-center space-x-2">
                     <Checkbox
-                      id={key}
-                      checked={
-                        config.selectedMetrics[
-                          key as keyof typeof config.selectedMetrics
-                        ]
-                      }
+                      id={`metric-${key}`}
+                      checked={config.selectedMetrics[key as keyof typeof config.selectedMetrics]}
                       onCheckedChange={(checked) =>
                         setConfig({
                           ...config,
@@ -531,8 +485,8 @@ export const ExportReportDialog = ({
                       }
                     />
                     <label
-                      htmlFor={key}
-                      className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      htmlFor={`metric-${key}`}
+                      className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
                       {label}
                     </label>
@@ -542,9 +496,14 @@ export const ExportReportDialog = ({
             </div>
           </div>
         </ScrollArea>
-        <div className="flex justify-end pt-4 border-t">
+
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
           <Button onClick={handleExport} disabled={isLoading}>
-            {isLoading ? 'Gerando...' : 'Gerar PDF'}
+            <Download className="mr-2 h-4 w-4" />
+            {isLoading ? 'Gerando...' : 'Exportar PDF'}
           </Button>
         </div>
       </DialogContent>
