@@ -8,7 +8,9 @@ import { useIntegrations } from '@/hooks/useIntegrations';
 import { useAdAccounts } from '@/hooks/useAdAccounts';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Facebook, Loader2, CheckCircle, XCircle, Pencil, Trash2 } from 'lucide-react';
+import { Facebook, Loader2, CheckCircle, XCircle, Pencil, Trash2, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -242,6 +244,15 @@ export default function MetaAds() {
               ? 'Seu token de acesso expirou. Clique em "Editar" para atualizar o token'
               : 'Conecte sua conta para começar a importar dados'}
           </CardDescription>
+          {metaIntegration?.expires_at && (
+            <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground">
+              <Calendar className="h-3.5 w-3.5" />
+              <span>
+                {isExpired ? 'Expirou em: ' : 'Expira em: '}
+                {format(new Date(metaIntegration.expires_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              </span>
+            </div>
+          )}
         </CardHeader>
       </Card>
 
