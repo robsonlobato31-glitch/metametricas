@@ -10,6 +10,8 @@ import { useRealtimeAlertsContext } from '@/contexts/RealtimeAlertsContext';
 import { BudgetMonitorButton } from '@/components/BudgetMonitorButton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { CreateAlertForm } from '@/components/alerts/CreateAlertForm';
+import { AlertsList } from '@/components/alerts/AlertsList';
 
 export default function AlertaGasto() {
   const { alerts, isLoading, refetch } = useCampaignAlerts();
@@ -61,15 +63,13 @@ export default function AlertaGasto() {
           </div>
         </div>
 
-        {/* Info Alert */}
-        <Alert>
-          <Bell className="h-4 w-4" />
-          <AlertDescription>
-            Alertas são gerados automaticamente quando uma campanha atinge 80% do orçamento configurado.
-          </AlertDescription>
-        </Alert>
+        {/* Custom Alerts Section */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <AlertsList />
+          <CreateAlertForm />
+        </div>
 
-        {/* Active Alerts */}
+        {/* Triggered Alerts Section */}
         <Card>
           <CardHeader>
             <CardTitle>
