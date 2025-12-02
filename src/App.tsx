@@ -16,6 +16,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import Campanhas from "./pages/Campanhas";
 import Metricas from "./pages/Metricas";
+import Relatorios from "./pages/Relatorios";
 import MetaAds from "./pages/MetaAds";
 import GoogleAds from "./pages/GoogleAds";
 import AlertaGasto from "./pages/AlertaGasto";
@@ -73,6 +74,16 @@ const App = () => (
                   <ProtectedRoute>
                     <DashboardLayout>
                       <Metricas />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/relatorios"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <Relatorios />
                     </DashboardLayout>
                   </ProtectedRoute>
                 }
