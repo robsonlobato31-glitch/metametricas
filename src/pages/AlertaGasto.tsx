@@ -289,10 +289,10 @@ export default function AlertaGasto() {
           ) : filteredAlerts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {filteredAlerts.map((alert) => {
-                const dailyBudget = alert.campaigns.daily_budget || 0;
+                const dailyBudget = alert.campaigns?.daily_budget || 0;
                 const monthlyBudget = dailyBudget * 30;
-                const accountName = alert.campaigns.ad_accounts?.account_name || 'Conta não identificada';
-                const percentage = alert.percentage;
+                const accountName = alert.campaigns?.ad_accounts?.account_name || 'Conta não identificada';
+                const percentage = alert.percentage ?? 0;
                 
                 return (
                   <div
@@ -313,8 +313,8 @@ export default function AlertaGasto() {
                     </div>
 
                     {/* Campaign name */}
-                    <h3 className="text-sm font-medium truncate" title={alert.campaigns.name}>
-                      {alert.campaigns.name}
+                    <h3 className="text-sm font-medium truncate" title={alert.campaigns?.name || 'Campanha'}>
+                      {alert.campaigns?.name || 'Campanha sem nome'}
                     </h3>
 
                     {/* Budget info */}
@@ -330,7 +330,7 @@ export default function AlertaGasto() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Gasto Atual:</span>
                         <span className={`font-medium ${percentage >= 100 ? 'text-destructive' : percentage >= 80 ? 'text-yellow-500' : ''}`}>
-                          {formatCurrency(alert.current_amount)}
+                          {formatCurrency(alert.current_amount || 0)}
                         </span>
                       </div>
                     </div>
@@ -386,7 +386,7 @@ export default function AlertaGasto() {
                     {percentage >= 100 ? (
                       <div className="flex items-center gap-1 text-xs text-destructive">
                         <AlertTriangle className="h-3 w-3" />
-                        <span>Excedido: {formatCurrency(alert.current_amount - monthlyBudget)}</span>
+                        <span>Excedido: {formatCurrency((alert.current_amount || 0) - monthlyBudget)}</span>
                       </div>
                     ) : percentage >= 90 ? (
                       <div className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-500">
