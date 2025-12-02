@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -23,12 +22,86 @@ import {
 } from '@/components/ui/select';
 import { useColumnPreferences, type PageName } from '@/hooks/useColumnPreferences';
 import { useColumnPresets, type ColumnPreset } from '@/hooks/useColumnPresets';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { cn } from '@/lib/utils';
 
 interface Column {
   id: string;
   label: string;
   required?: boolean;
 }
+
+interface SortableColumnItemProps {
+  column: Column;
+  isSelected: boolean;
+  onToggle: () => void;
+}
+
+const SortableColumnItem = ({ column, isSelected, onToggle }: SortableColumnItemProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: column.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex items-center space-x-3 p-2 rounded-md bg-background',
+        isDragging && 'opacity-50 bg-muted shadow-lg z-50'
+      )}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing touch-none"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+      </button>
+      <Checkbox
+        id={column.id}
+        checked={isSelected}
+        onCheckedChange={onToggle}
+        disabled={column.required}
+      />
+      <label
+        htmlFor={column.id}
+        className="flex-1 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none"
+      >
+        {column.label}
+        {column.required && (
+          <span className="ml-2 text-xs text-muted-foreground">(obrigatório)</span>
+        )}
+      </label>
+    </div>
+  );
+};
 
 interface ColumnCustomizerProps {
   pageName: PageName;
@@ -54,25 +127,40 @@ export const ColumnCustomizer = ({
 
   const [open, setOpen] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
+  const [columnOrder, setColumnOrder] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [selectedPresetId, setSelectedPresetId] = useState<string>('');
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     if (!initialized) {
-      // First check for default preset
+      const defaultOrder = availableColumns.map((col) => col.id);
+      
       if (defaultPreset?.visible_columns && defaultPreset.visible_columns.length > 0) {
         setSelectedColumns(defaultPreset.visible_columns);
+        setColumnOrder(defaultPreset.column_order?.length ? defaultPreset.column_order : defaultOrder);
         onColumnsChange?.(defaultPreset.visible_columns);
         setSelectedPresetId(defaultPreset.id);
       } else if (preferences?.visible_columns && preferences.visible_columns.length > 0) {
         setSelectedColumns(preferences.visible_columns);
+        setColumnOrder(preferences.column_order?.length ? preferences.column_order : defaultOrder);
         onColumnsChange?.(preferences.visible_columns);
       } else {
-        const allColumns = availableColumns.map((col) => col.id);
-        setSelectedColumns(allColumns);
-        onColumnsChange?.(allColumns);
+        setSelectedColumns(defaultOrder);
+        setColumnOrder(defaultOrder);
+        onColumnsChange?.(defaultOrder);
       }
       setInitialized(true);
     }
@@ -87,18 +175,34 @@ export const ColumnCustomizer = ({
         ? prev.filter((id) => id !== columnId)
         : [...prev, columnId]
     );
-    setSelectedPresetId(''); // Clear preset selection when manually changing
+    setSelectedPresetId('');
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+      setSelectedPresetId('');
+    }
   };
 
   const handleSave = () => {
-    savePreferences({ visibleColumns: selectedColumns });
-    onColumnsChange?.(selectedColumns);
+    // Filter selected columns in the order they appear in columnOrder
+    const orderedVisibleColumns = columnOrder.filter((id) => selectedColumns.includes(id));
+    savePreferences({ visibleColumns: orderedVisibleColumns, columnOrder });
+    onColumnsChange?.(orderedVisibleColumns);
     setOpen(false);
   };
 
   const handleReset = () => {
     const allColumns = availableColumns.map((col) => col.id);
     setSelectedColumns(allColumns);
+    setColumnOrder(allColumns);
     setSelectedPresetId('');
   };
 
@@ -107,6 +211,7 @@ export const ColumnCustomizer = ({
     createPreset({
       presetName: newPresetName.trim(),
       visibleColumns: selectedColumns,
+      columnOrder: columnOrder,
     });
     setNewPresetName('');
     setShowSavePreset(false);
@@ -114,6 +219,7 @@ export const ColumnCustomizer = ({
 
   const handleApplyPreset = (preset: ColumnPreset) => {
     setSelectedColumns(preset.visible_columns);
+    setColumnOrder(preset.column_order?.length ? preset.column_order : availableColumns.map((c) => c.id));
     setSelectedPresetId(preset.id);
   };
 
@@ -139,6 +245,16 @@ export const ColumnCustomizer = ({
     }
   };
 
+  // Order availableColumns based on columnOrder
+  const orderedColumns = [...availableColumns].sort((a, b) => {
+    const indexA = columnOrder.indexOf(a.id);
+    const indexB = columnOrder.indexOf(b.id);
+    if (indexA === -1 && indexB === -1) return 0;
+    if (indexA === -1) return 1;
+    if (indexB === -1) return -1;
+    return indexA - indexB;
+  });
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -151,7 +267,7 @@ export const ColumnCustomizer = ({
         <DialogHeader>
           <DialogTitle>Personalizar Colunas</DialogTitle>
           <DialogDescription>
-            Selecione as colunas e salve presets para acesso rápido
+            Arraste para reordenar e selecione as colunas visíveis
           </DialogDescription>
         </DialogHeader>
 
@@ -182,7 +298,6 @@ export const ColumnCustomizer = ({
                 </SelectContent>
               </Select>
 
-              {/* Preset Actions */}
               {selectedPresetId && (
                 <div className="flex gap-2">
                   <Button
@@ -210,30 +325,29 @@ export const ColumnCustomizer = ({
           </>
         )}
 
-        {/* Columns Selection */}
+        {/* Columns Selection with Drag and Drop */}
         <ScrollArea className="h-[300px] pr-4">
-          <div className="space-y-3">
-            {availableColumns.map((column) => (
-              <div key={column.id} className="flex items-center space-x-3">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <Checkbox
-                  id={column.id}
-                  checked={selectedColumns.includes(column.id)}
-                  onCheckedChange={() => handleToggleColumn(column.id)}
-                  disabled={column.required}
-                />
-                <label
-                  htmlFor={column.id}
-                  className="flex-1 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  {column.label}
-                  {column.required && (
-                    <span className="ml-2 text-xs text-muted-foreground">(obrigatório)</span>
-                  )}
-                </label>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={orderedColumns.map((c) => c.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-1">
+                {orderedColumns.map((column) => (
+                  <SortableColumnItem
+                    key={column.id}
+                    column={column}
+                    isSelected={selectedColumns.includes(column.id)}
+                    onToggle={() => handleToggleColumn(column.id)}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         </ScrollArea>
 
         <Separator />
