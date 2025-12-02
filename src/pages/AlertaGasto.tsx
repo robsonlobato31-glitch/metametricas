@@ -92,7 +92,7 @@ export default function AlertaGasto() {
       if (error) throw error;
 
       toast.success('Alertas Atualizados', {
-        description: `${data.campaigns_checked} campanhas verificadas. ${data.alerts_updated || 0} alertas atualizados.`,
+        description: `${data.campaigns_checked} campanhas verificadas. ${data.alerts_updated || 0} registros de alerta atualizados.`,
       });
       refetch();
     } catch (error: any) {

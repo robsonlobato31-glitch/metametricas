@@ -110,7 +110,10 @@ Deno.serve(async (req) => {
       if (!existingAlertsError && existingCampaignAlerts && existingCampaignAlerts.length > 0) {
         const { error: updateError } = await supabase
           .from('campaign_alerts')
-          .update({ current_amount: currentSpend })
+          .update({ 
+            current_amount: currentSpend,
+            triggered_at: new Date().toISOString()
+          })
           .eq('campaign_id', campaign.id)
           .eq('is_active', true);
 
