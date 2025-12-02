@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { Edit3, Plus, RotateCcw, Save, Settings2 } from 'lucide-react';
@@ -38,6 +38,13 @@ export default function Dashboard() {
   const [visibleWidgets, setVisibleWidgets] = useState<string[]>(
     layout.widgets.map((w) => w.type)
   );
+
+  // Sincronizar currentLayouts quando o layout muda (ex: após remover widget)
+  useEffect(() => {
+    if (!isEditMode) {
+      setCurrentLayouts(layout.layouts);
+    }
+  }, [layout.layouts, layout.widgets, isEditMode]);
 
   const handleStartTour = () => {
     setRunTour(true);
