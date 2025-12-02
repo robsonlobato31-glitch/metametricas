@@ -207,6 +207,21 @@ export default function AlertaGasto() {
             <CardDescription>
               Campanhas que requerem atenção imediata
             </CardDescription>
+            {/* Legenda de cores */}
+            <div className="flex flex-wrap gap-4 mt-3 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-green-500" />
+                <span className="text-muted-foreground">&lt; 80%</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                <span className="text-muted-foreground">80% - 94%</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-destructive" />
+                <span className="text-muted-foreground">≥ 95%</span>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
