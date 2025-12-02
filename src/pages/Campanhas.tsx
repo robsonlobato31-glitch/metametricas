@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -374,43 +375,58 @@ export default function Campanhas() {
             />
           </div>
 
-          <div className="w-[180px]">
-            <AdAccountFilter
-              value={accountId}
-              onChange={setAccountId}
-              provider={provider}
-            />
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">
+              Conta de Anúncio
+            </Label>
+            <div className="w-[180px]">
+              <AdAccountFilter
+                value={accountId}
+                onChange={setAccountId}
+                provider={provider}
+              />
+            </div>
           </div>
 
-          <Select
-            value={provider || 'all'}
-            onValueChange={(v) => setProvider(v === 'all' ? undefined : (v as 'meta' | 'google'))}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Plataforma" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover">
-              <SelectItem value="all">Todas</SelectItem>
-              <SelectItem value="meta">Meta Ads</SelectItem>
-              <SelectItem value="google">Google Ads</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">
+              Plataforma
+            </Label>
+            <Select
+              value={provider || 'all'}
+              onValueChange={(v) => setProvider(v === 'all' ? undefined : (v as 'meta' | 'google'))}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Plataforma" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="meta">Meta Ads</SelectItem>
+                <SelectItem value="google">Google Ads</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          <Select
-            value={status || 'all'}
-            onValueChange={(v) => setStatus(v === 'all' ? undefined : v)}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover">
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="ACTIVE">Ativas</SelectItem>
-              <SelectItem value="PAUSED">Pausadas</SelectItem>
-              <SelectItem value="DELETED">Deletadas</SelectItem>
-              <SelectItem value="HAD_DELIVERY">Veiculadas</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">
+              Status
+            </Label>
+            <Select
+              value={status || 'all'}
+              onValueChange={(v) => setStatus(v === 'all' ? undefined : v)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="ACTIVE">Ativas</SelectItem>
+                <SelectItem value="PAUSED">Pausadas</SelectItem>
+                <SelectItem value="DELETED">Deletadas</SelectItem>
+                <SelectItem value="HAD_DELIVERY">Veiculadas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="w-[250px]">
             <DateRangePicker
