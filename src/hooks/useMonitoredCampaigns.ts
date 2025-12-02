@@ -78,8 +78,10 @@ export const useMonitoredCampaigns = () => {
         });
       });
 
-      // Sort by percentage descending (highest risk first)
-      return Array.from(campaignMap.values()).sort((a, b) => b.percentage - a.percentage);
+      // Filter only campaigns with spend > 0 and sort by percentage descending
+      return Array.from(campaignMap.values())
+        .filter((c) => c.current_spend > 0)
+        .sort((a, b) => b.percentage - a.percentage);
     },
     enabled: !!user?.id,
   });
