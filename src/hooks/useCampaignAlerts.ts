@@ -23,6 +23,23 @@ type CampaignAlertWithDetails = {
   };
 };
 
+export type GroupedCampaignAlert = {
+  campaign_id: string;
+  campaigns: {
+    name: string;
+    status: string;
+    daily_budget: number | null;
+    ad_accounts: {
+      account_name: string;
+      provider: string;
+    };
+  };
+  current_amount: number;
+  updated_at: string;
+  triggered_thresholds: number[];
+  percentage: number;
+};
+
 export const useCampaignAlerts = () => {
   const { user } = useAuth();
 
@@ -55,19 +72,51 @@ export const useCampaignAlerts = () => {
 
       if (error) throw error;
 
-      return (data || []) as unknown as CampaignAlertWithDetails[];
+      const rawAlerts = (data || []) as unknown as CampaignAlertWithDetails[];
+
+      // Group alerts by campaign_id - keeping only one entry per campaign
+      const groupedMap = new Map<string, GroupedCampaignAlert>();
+
+      rawAlerts.forEach((alert) => {
+        const existing = groupedMap.get(alert.campaign_id);
+        
+        if (!existing) {
+          const dailyBudget = alert.campaigns.daily_budget || alert.threshold_amount;
+          const monthlyBudget = dailyBudget * 30;
+          const percentage = monthlyBudget > 0 ? (alert.current_amount / monthlyBudget) * 100 : 0;
+
+          groupedMap.set(alert.campaign_id, {
+            campaign_id: alert.campaign_id,
+            campaigns: alert.campaigns,
+            current_amount: alert.current_amount,
+            updated_at: alert.triggered_at,
+            triggered_thresholds: [alert.threshold_amount],
+            percentage,
+          });
+        } else {
+          // Add threshold if not already present
+          if (!existing.triggered_thresholds.includes(alert.threshold_amount)) {
+            existing.triggered_thresholds.push(alert.threshold_amount);
+          }
+          // Update to most recent values
+          if (new Date(alert.triggered_at) > new Date(existing.updated_at)) {
+            existing.current_amount = alert.current_amount;
+            existing.updated_at = alert.triggered_at;
+            // Recalculate percentage
+            const dailyBudget = alert.campaigns.daily_budget || alert.threshold_amount;
+            const monthlyBudget = dailyBudget * 30;
+            existing.percentage = monthlyBudget > 0 ? (existing.current_amount / monthlyBudget) * 100 : 0;
+          }
+        }
+      });
+
+      return Array.from(groupedMap.values());
     },
     enabled: !!user?.id,
   });
 
-  // Calculate percentage for each alert
-  const alertsWithPercentage = alerts?.map((alert) => ({
-    ...alert,
-    percentage: (alert.current_amount / alert.threshold_amount) * 100,
-  }));
-
   return {
-    alerts: alertsWithPercentage || [],
+    alerts: alerts || [],
     isLoading,
     error,
     refetch,
