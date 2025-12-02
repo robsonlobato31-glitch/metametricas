@@ -15,6 +15,11 @@ type CampaignAlertWithDetails = {
   campaigns: {
     name: string;
     status: string;
+    daily_budget: number | null;
+    ad_accounts: {
+      account_name: string;
+      provider: string;
+    };
   };
 };
 
@@ -34,7 +39,10 @@ export const useCampaignAlerts = () => {
           campaigns!inner(
             name,
             status,
+            daily_budget,
             ad_accounts!inner(
+              account_name,
+              provider,
               integrations!inner(
                 user_id
               )
