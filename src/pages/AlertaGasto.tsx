@@ -278,7 +278,7 @@ export default function AlertaGasto() {
                               ? 'bg-destructive'
                               : actualPercentage >= 80
                               ? 'bg-yellow-500'
-                              : 'bg-primary'
+                              : 'bg-green-500'
                           }`}
                           style={{ width: `${Math.min(actualPercentage, 100)}%` }}
                         />
