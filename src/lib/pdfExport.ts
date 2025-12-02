@@ -26,21 +26,47 @@ const hexToRgb = (hex: string): [number, number, number] => {
     : [59, 130, 246]; // Default blue
 };
 
-// Load image as base64 to avoid CORS issues
-const loadImageAsBase64 = async (url: string): Promise<string | null> => {
+// Load image as base64 to avoid CORS issues with timeout
+const loadImageAsBase64 = async (url: string, timeout = 10000): Promise<string | null> => {
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Failed to fetch image');
+    console.log('Loading logo from URL:', url);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    const response = await fetch(url, { 
+      signal: controller.signal,
+      mode: 'cors',
+      cache: 'no-cache',
+    });
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      console.error('Failed to fetch image:', response.status, response.statusText);
+      return null;
+    }
+    
     const blob = await response.blob();
+    console.log('Image blob size:', blob.size, 'type:', blob.type);
     
     return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
+      reader.onloadend = () => {
+        console.log('Image loaded as base64 successfully');
+        resolve(reader.result as string);
+      };
+      reader.onerror = (error) => {
+        console.error('FileReader error:', error);
+        resolve(null);
+      };
       reader.readAsDataURL(blob);
     });
   } catch (error) {
-    console.error('Error loading logo:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error('Logo loading timed out after', timeout, 'ms');
+    } else {
+      console.error('Error loading logo:', error);
+    }
     return null;
   }
 };
@@ -77,22 +103,38 @@ export const generateReportHeader = async (
   
   // Add logo if provided - using base64 conversion to avoid CORS
   if (options?.logoUrl) {
+    console.log('Attempting to load logo for PDF:', options.logoUrl);
     const logoBase64 = await loadImageAsBase64(options.logoUrl);
     if (logoBase64) {
       try {
-        doc.addImage(logoBase64, 'PNG', 20, startY, 30, 30);
+        // Detect image format from base64 string
+        let imageFormat = 'PNG';
+        if (logoBase64.includes('data:image/jpeg') || logoBase64.includes('data:image/jpg')) {
+          imageFormat = 'JPEG';
+        } else if (logoBase64.includes('data:image/png')) {
+          imageFormat = 'PNG';
+        } else if (logoBase64.includes('data:image/gif')) {
+          imageFormat = 'GIF';
+        }
+        
+        doc.addImage(logoBase64, imageFormat, 20, startY, 30, 30);
         logoXOffset = 55;
+        console.log('Logo added to PDF successfully');
       } catch (error) {
         console.error('Error adding logo to PDF:', error);
       }
+    } else {
+      console.warn('Failed to load logo, proceeding without it');
     }
   }
 
-  // Header text with custom color
+  // Header text with custom color - USE THE CUSTOM HEADER TEXT
   doc.setFontSize(20);
   doc.setTextColor(...rgb);
-  const headerText = options?.headerText || title;
-  doc.text(headerText, logoXOffset, startY + 10);
+  // IMPORTANT: Use headerText from options if provided, otherwise use title
+  const displayHeaderText = options?.headerText || title;
+  console.log('Using header text:', displayHeaderText);
+  doc.text(displayHeaderText, logoXOffset, startY + 10);
 
   doc.setFontSize(11);
   doc.setTextColor(100, 100, 100);

@@ -24,21 +24,21 @@ export const useReportTemplate = () => {
     queryFn: async () => {
       if (!user?.id) return null;
 
+      // Get the most recent template for the user
       const { data, error } = await supabase
         .from('report_templates')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // No template found, return default
-          return null;
-        }
+        console.error('Error fetching template:', error);
         throw error;
       }
 
-      return data as ReportTemplate;
+      return data as ReportTemplate | null;
     },
     enabled: !!user?.id,
   });
@@ -47,17 +47,51 @@ export const useReportTemplate = () => {
     mutationFn: async (updates: Partial<ReportTemplate>) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
+      // Check if template already exists
+      const { data: existingTemplate } = await supabase
         .from('report_templates')
-        .upsert({
-          user_id: user.id,
-          ...updates,
-        })
-        .select()
-        .single();
+        .select('id')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (error) throw error;
-      return data;
+      let result;
+
+      if (existingTemplate?.id) {
+        // UPDATE existing template
+        const { data, error } = await supabase
+          .from('report_templates')
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingTemplate.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        result = data;
+      } else {
+        // INSERT new template
+        const { data, error } = await supabase
+          .from('report_templates')
+          .insert({
+            user_id: user.id,
+            primary_color: updates.primary_color || '#3B82F6',
+            secondary_color: updates.secondary_color || '#64748B',
+            header_text: updates.header_text || 'Relatório de Campanhas',
+            footer_text: updates.footer_text || null,
+            logo_url: updates.logo_url || null,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        result = data;
+      }
+
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['report-template', user?.id] });
@@ -81,7 +115,8 @@ export const useReportTemplate = () => {
       if (!user?.id) throw new Error('User not authenticated');
 
       const fileExt = file.name.split('.').pop();
-      const filePath = `${user.id}/logo.${fileExt}`;
+      const timestamp = Date.now();
+      const filePath = `${user.id}/logo-${timestamp}.${fileExt}`;
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
