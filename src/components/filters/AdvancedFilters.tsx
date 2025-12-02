@@ -96,16 +96,16 @@ export const AdvancedFilters = ({ filters, onChange }: AdvancedFiltersProps) => 
           <div className="space-y-2">
             <Label>Objetivo da Campanha</Label>
             <Select
-              value={localFilters.objective || ''}
+              value={localFilters.objective || 'all'}
               onValueChange={(value) =>
-                setLocalFilters({ ...localFilters, objective: value || undefined })
+                setLocalFilters({ ...localFilters, objective: value === 'all' ? undefined : value })
               }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos os objetivos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os objetivos</SelectItem>
+                <SelectItem value="all">Todos os objetivos</SelectItem>
                 {objectives.map((obj) => (
                   <SelectItem key={obj.value} value={obj.value}>
                     {obj.label}
