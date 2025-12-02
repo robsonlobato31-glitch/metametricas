@@ -287,7 +287,7 @@ export default function AlertaGasto() {
                       {alert.percentage >= 100 && (
                         <div className="flex items-center gap-1 text-xs text-destructive">
                           <AlertTriangle className="h-3 w-3" />
-                          <span>Orçamento excedido!</span>
+                          <span>Orçamento excedido: {formatCurrency(alert.current_amount - dailyBudget)}</span>
                         </div>
                       )}
 
