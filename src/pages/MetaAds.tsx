@@ -8,7 +8,17 @@ import { useIntegrations } from '@/hooks/useIntegrations';
 import { useAdAccounts } from '@/hooks/useAdAccounts';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Facebook, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Facebook, Loader2, CheckCircle, XCircle, Pencil, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function MetaAds() {
   const { data: integrations, refetch: refetchIntegrations } = useIntegrations();
@@ -17,6 +27,8 @@ export default function MetaAds() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showEditToken, setShowEditToken] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
 
   const metaIntegration = integrations?.find(i => i.provider === 'meta');
   const isConnected = metaIntegration?.status === 'active';
@@ -38,21 +50,37 @@ export default function MetaAds() {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 60);
 
-      // Criar/atualizar integração
-      const { error } = await supabase.from('integrations').upsert({
-        user_id: user.id,
-        provider: 'meta',
-        access_token: accessToken,
-        expires_at: expiresAt.toISOString(),
-        status: 'active',
-        integration_source: 'oauth_manual',
-      }, {
-        onConflict: 'user_id,provider',
-      });
+      if (metaIntegration) {
+        // UPDATE existing integration
+        const { error } = await supabase
+          .from('integrations')
+          .update({
+            access_token: accessToken,
+            expires_at: expiresAt.toISOString(),
+            status: 'active',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', metaIntegration.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success('Token atualizado com sucesso!');
+      } else {
+        // INSERT new integration
+        const { error } = await supabase
+          .from('integrations')
+          .insert({
+            user_id: user.id,
+            provider: 'meta',
+            access_token: accessToken,
+            expires_at: expiresAt.toISOString(),
+            status: 'active',
+            integration_source: 'oauth_manual',
+          });
 
-      toast.success('Meta Ads conectado com sucesso!');
+        if (error) throw error;
+        toast.success('Meta Ads conectado com sucesso!');
+      }
+
       setAccessToken('');
       setShowEditToken(false);
       refetchIntegrations();
@@ -65,6 +93,39 @@ export default function MetaAds() {
     }
   };
 
+  const handleRemoveIntegration = async () => {
+    if (!metaIntegration) return;
+
+    setIsRemoving(true);
+    try {
+      // First remove related ad_accounts
+      const { error: accountsError } = await supabase
+        .from('ad_accounts')
+        .delete()
+        .eq('integration_id', metaIntegration.id);
+
+      if (accountsError) throw accountsError;
+
+      // Then remove the integration
+      const { error } = await supabase
+        .from('integrations')
+        .delete()
+        .eq('id', metaIntegration.id);
+
+      if (error) throw error;
+
+      toast.success('Integração removida com sucesso!');
+      setShowRemoveDialog(false);
+      setShowEditToken(false);
+      refetchIntegrations();
+      refetchAccounts();
+    } catch (error: any) {
+      toast.error('Erro ao remover', { description: error.message });
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
   const handleSync = async () => {
     setIsSyncing(true);
 
@@ -74,7 +135,7 @@ export default function MetaAds() {
 
       // Chamar edge function de sincronização
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-meta-campaigns`,
+        `https://jsrnqheidlbffwmiazqi.supabase.co/functions/v1/sync-meta-campaigns`,
         {
           method: 'POST',
           headers: {
@@ -117,184 +178,231 @@ export default function MetaAds() {
 
   return (
     <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Meta Ads</h1>
-          <p className="text-muted-foreground mt-1">
-            Conecte e sincronize suas campanhas do Facebook e Instagram
-          </p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Meta Ads</h1>
+        <p className="text-muted-foreground mt-1">
+          Conecte e sincronize suas campanhas do Facebook e Instagram
+        </p>
+      </div>
 
-        {/* Status Card */}
+      {/* Status Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Facebook className="h-5 w-5 text-blue-500" />
+              <CardTitle>Status da Integração</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              {isConnected ? (
+                <Badge variant="default" className="gap-1">
+                  <CheckCircle className="h-3 w-3" />
+                  Conectado
+                </Badge>
+              ) : isExpired ? (
+                <Badge variant="destructive" className="gap-1">
+                  <XCircle className="h-3 w-3" />
+                  Token Expirado
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="gap-1">
+                  <XCircle className="h-3 w-3" />
+                  Desconectado
+                </Badge>
+              )}
+
+              {/* Action buttons when integration exists */}
+              {metaIntegration && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowEditToken(true)}
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRemoveDialog(true)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Remover
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+          <CardDescription>
+            {isConnected
+              ? 'Sua conta Meta Ads está conectada e funcionando'
+              : isExpired
+              ? 'Seu token de acesso expirou. Clique em "Editar" para atualizar o token'
+              : 'Conecte sua conta para começar a importar dados'}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      {/* Connect/Edit Token Card */}
+      {(!metaIntegration || isExpired || showEditToken) && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Facebook className="h-5 w-5 text-blue-500" />
-                <CardTitle>Status da Integração</CardTitle>
-              </div>
-              <div className="flex items-center gap-2">
-                {isConnected ? (
-                  <>
-                    <Badge variant="default" className="gap-1">
-                      <CheckCircle className="h-3 w-3" />
-                      Conectado
-                    </Badge>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setShowEditToken(true)}
-                    >
-                      Editar
-                    </Button>
-                  </>
-                ) : isExpired ? (
-                  <Badge variant="destructive" className="gap-1">
-                    <XCircle className="h-3 w-3" />
-                    Token Expirado
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="gap-1">
-                    <XCircle className="h-3 w-3" />
-                    Desconectado
-                  </Badge>
-                )}
-              </div>
-            </div>
+            <CardTitle>
+              {isExpired ? 'Reconectar' : showEditToken ? 'Editar Token' : 'Conectar'} Meta Ads
+            </CardTitle>
             <CardDescription>
-              {isConnected
-                ? 'Sua conta Meta Ads está conectada e funcionando'
-                : isExpired
-                ? 'Seu token de acesso expirou. Reconecte para continuar sincronizando'
-                : 'Conecte sua conta para começar a importar dados'}
+              {isExpired
+                ? 'Seu token expirou. Gere um novo token no Meta Business Manager e conecte novamente'
+                : showEditToken
+                ? 'Atualize seu token de acesso do Meta Ads'
+                : 'Cole o token de acesso gerado no Meta Business Manager'}
             </CardDescription>
           </CardHeader>
-        </Card>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="accessToken">Access Token</Label>
+              <Input
+                id="accessToken"
+                type="password"
+                placeholder="EAABwzLixnjY..."
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+                disabled={isConnecting}
+              />
+              <p className="text-sm text-muted-foreground">
+                Obtenha seu token em:{' '}
+                <a
+                  href="https://developers.facebook.com/tools/explorer/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  Meta Graph API Explorer
+                </a>
+              </p>
+            </div>
 
-        {/* Connect/Edit Token Card */}
-        {(!isConnected || isExpired || showEditToken) && (
+            <div className="flex gap-2">
+              <Button onClick={handleConnect} disabled={isConnecting || !accessToken.trim()}>
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Conectando...
+                  </>
+                ) : metaIntegration ? (
+                  'Atualizar Token'
+                ) : (
+                  'Conectar Meta Ads'
+                )}
+              </Button>
+              {showEditToken && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditToken(false);
+                    setAccessToken('');
+                  }}
+                >
+                  Cancelar
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sync and Accounts */}
+      {isConnected && !showEditToken && (
+        <>
           <Card>
             <CardHeader>
-              <CardTitle>
-                {isExpired ? 'Reconectar' : showEditToken ? 'Editar Token' : 'Conectar'} Meta Ads
-              </CardTitle>
+              <CardTitle>Sincronizar Dados</CardTitle>
               <CardDescription>
-                {isExpired 
-                  ? 'Seu token expirou. Gere um novo token no Meta Business Manager e conecte novamente'
-                  : showEditToken
-                  ? 'Atualize seu token de acesso do Meta Ads'
-                  : 'Cole o token de acesso gerado no Meta Business Manager'}
+                Importe campanhas e métricas do Meta Ads
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="accessToken">Access Token</Label>
-                <Input
-                  id="accessToken"
-                  type="password"
-                  placeholder="EAABwzLixnjY..."
-                  value={accessToken}
-                  onChange={(e) => setAccessToken(e.target.value)}
-                  disabled={isConnecting}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Obtenha seu token em:{' '}
-                  <a
-                    href="https://developers.facebook.com/tools/explorer/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    Meta Graph API Explorer
-                  </a>
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                <Button onClick={handleConnect} disabled={isConnecting || !accessToken.trim()}>
-                  {isConnecting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Conectando...
-                    </>
-                  ) : (
-                    showEditToken ? 'Atualizar Token' : 'Conectar Meta Ads'
-                  )}
-                </Button>
-                {showEditToken && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setShowEditToken(false);
-                      setAccessToken('');
-                    }}
-                  >
-                    Cancelar
-                  </Button>
+            <CardContent>
+              <Button onClick={handleSync} disabled={isSyncing}>
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sincronizando...
+                  </>
+                ) : (
+                  'Sincronizar Agora'
                 )}
-              </div>
+              </Button>
             </CardContent>
           </Card>
-        )}
 
-        {/* Sync and Accounts */}
-        {isConnected && !showEditToken && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle>Sincronizar Dados</CardTitle>
-                <CardDescription>
-                  Importe campanhas e métricas do Meta Ads
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button onClick={handleSync} disabled={isSyncing}>
-                  {isSyncing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sincronizando...
-                    </>
-                  ) : (
-                    'Sincronizar Agora'
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Ad Accounts */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Contas Conectadas</CardTitle>
-                <CardDescription>
-                  {adAccounts?.length || 0} conta(s) de anúncios
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {adAccounts && adAccounts.length > 0 ? (
-                  <div className="space-y-2">
-                    {adAccounts.map((account) => (
-                      <div
-                        key={account.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">{account.account_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            ID: {account.account_id}
-                          </p>
-                        </div>
-                        <Badge variant="outline">{account.currency}</Badge>
+          {/* Ad Accounts */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Contas Conectadas</CardTitle>
+              <CardDescription>
+                {adAccounts?.length || 0} conta(s) de anúncios
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {adAccounts && adAccounts.length > 0 ? (
+                <div className="space-y-2">
+                  {adAccounts.map((account) => (
+                    <div
+                      key={account.id}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium">{account.account_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          ID: {account.account_id}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhuma conta conectada. Clique em "Sincronizar Agora" para importar suas contas.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
+                      <Badge variant="outline">{account.currency}</Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma conta conectada. Clique em "Sincronizar Agora" para importar suas contas.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Remove Integration Dialog */}
+      <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover Integração</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover a integração com Meta Ads?
+              Isso irá remover todas as contas de anúncios sincronizadas.
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveIntegration}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isRemoving}
+            >
+              {isRemoving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Removendo...
+                </>
+              ) : (
+                'Remover'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
