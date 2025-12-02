@@ -179,7 +179,7 @@ export default function MetaAds() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Meta Ads</h1>
         <p className="text-muted-foreground mt-1">
@@ -187,83 +187,151 @@ export default function MetaAds() {
         </p>
       </div>
 
-      {/* Status Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Facebook className="h-5 w-5 text-blue-500" />
-              <CardTitle>Status da Integração</CardTitle>
-            </div>
-            <div className="flex items-center gap-2">
-              {isConnected ? (
+      {/* Status Card + Sync Card side by side when connected */}
+      {isConnected && !showEditToken ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Status Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Facebook className="h-5 w-5 text-blue-500" />
+                  <CardTitle className="text-lg">Status da Integração</CardTitle>
+                </div>
                 <Badge variant="default" className="gap-1">
                   <CheckCircle className="h-3 w-3" />
                   Conectado
                 </Badge>
-              ) : isExpired ? (
-                <Badge variant="destructive" className="gap-1">
-                  <XCircle className="h-3 w-3" />
-                  Token Expirado
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="gap-1">
-                  <XCircle className="h-3 w-3" />
-                  Desconectado
-                </Badge>
+              </div>
+              <CardDescription className="text-sm">
+                Sua conta Meta Ads está conectada e funcionando
+              </CardDescription>
+              {metaIntegration?.expires_at && (
+                <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                  <Calendar className="h-3 w-3" />
+                  <span>
+                    Expira em: {format(new Date(metaIntegration.expires_at), "dd/MM/yyyy", { locale: ptBR })}
+                  </span>
+                </div>
               )}
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowEditToken(true)}
+                >
+                  <Pencil className="h-3 w-3 mr-1" />
+                  Editar
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRemoveDialog(true)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Remover
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Action buttons when integration exists */}
-              {metaIntegration && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowEditToken(true)}
-                  >
-                    <Pencil className="h-3 w-3 mr-1" />
-                    Editar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowRemoveDialog(true)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Remover
-                  </Button>
-                </>
-              )}
+          {/* Sync Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Sincronizar Dados</CardTitle>
+              <CardDescription className="text-sm">
+                Importe campanhas e métricas do Meta Ads
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <Button onClick={handleSync} disabled={isSyncing} size="sm">
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sincronizando...
+                  </>
+                ) : (
+                  'Sincronizar Agora'
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        /* Status Card when not connected */
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Facebook className="h-5 w-5 text-blue-500" />
+                <CardTitle className="text-lg">Status da Integração</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                {isExpired ? (
+                  <Badge variant="destructive" className="gap-1">
+                    <XCircle className="h-3 w-3" />
+                    Token Expirado
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="gap-1">
+                    <XCircle className="h-3 w-3" />
+                    Desconectado
+                  </Badge>
+                )}
+
+                {/* Action buttons when integration exists */}
+                {metaIntegration && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowEditToken(true)}
+                    >
+                      <Pencil className="h-3 w-3 mr-1" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowRemoveDialog(true)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Remover
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-          <CardDescription>
-            {isConnected
-              ? 'Sua conta Meta Ads está conectada e funcionando'
-              : isExpired
-              ? 'Seu token de acesso expirou. Clique em "Editar" para atualizar o token'
-              : 'Conecte sua conta para começar a importar dados'}
-          </CardDescription>
-          {metaIntegration?.expires_at && (
-            <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground">
-              <Calendar className="h-3.5 w-3.5" />
-              <span>
-                {isExpired ? 'Expirou em: ' : 'Expira em: '}
-                {format(new Date(metaIntegration.expires_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-              </span>
-            </div>
-          )}
-        </CardHeader>
-      </Card>
+            <CardDescription className="text-sm">
+              {isExpired
+                ? 'Seu token de acesso expirou. Clique em "Editar" para atualizar o token'
+                : 'Conecte sua conta para começar a importar dados'}
+            </CardDescription>
+            {metaIntegration?.expires_at && (
+              <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                <span>
+                  {isExpired ? 'Expirou em: ' : 'Expira em: '}
+                  {format(new Date(metaIntegration.expires_at), "dd/MM/yyyy", { locale: ptBR })}
+                </span>
+              </div>
+            )}
+          </CardHeader>
+        </Card>
+      )}
 
       {/* Connect/Edit Token Card */}
       {(!metaIntegration || isExpired || showEditToken) && (
         <Card>
-          <CardHeader>
-            <CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">
               {isExpired ? 'Reconectar' : showEditToken ? 'Editar Token' : 'Conectar'} Meta Ads
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               {isExpired
                 ? 'Seu token expirou. Gere um novo token no Meta Business Manager e conecte novamente'
                 : showEditToken
@@ -271,7 +339,7 @@ export default function MetaAds() {
                 : 'Cole o token de acesso gerado no Meta Business Manager'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-0">
             <div className="space-y-2">
               <Label htmlFor="accessToken">Access Token</Label>
               <Input
@@ -324,64 +392,42 @@ export default function MetaAds() {
         </Card>
       )}
 
-      {/* Sync and Accounts */}
+      {/* Ad Accounts - Grid layout with 4 columns */}
       {isConnected && !showEditToken && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Sincronizar Dados</CardTitle>
-              <CardDescription>
-                Importe campanhas e métricas do Meta Ads
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={handleSync} disabled={isSyncing}>
-                {isSyncing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sincronizando...
-                  </>
-                ) : (
-                  'Sincronizar Agora'
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Ad Accounts */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Contas Conectadas</CardTitle>
-              <CardDescription>
-                {adAccounts?.length || 0} conta(s) de anúncios
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {adAccounts && adAccounts.length > 0 ? (
-                <div className="space-y-2">
-                  {adAccounts.map((account) => (
-                    <div
-                      key={account.id}
-                      className="flex items-center justify-between p-3 border rounded-lg"
-                    >
-                      <div>
-                        <p className="font-medium">{account.account_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          ID: {account.account_id}
-                        </p>
-                      </div>
-                      <Badge variant="outline">{account.currency}</Badge>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Contas Conectadas</CardTitle>
+            <CardDescription className="text-sm">
+              {adAccounts?.length || 0} conta(s) de anúncios
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {adAccounts && adAccounts.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {adAccounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="p-2 border rounded-lg"
+                  >
+                    <p className="font-medium text-sm truncate">{account.account_name}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-xs text-muted-foreground truncate flex-1">
+                        ID: {account.account_id}
+                      </p>
+                      <Badge variant="outline" className="text-xs ml-1 shrink-0">
+                        {account.currency}
+                      </Badge>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nenhuma conta conectada. Clique em "Sincronizar Agora" para importar suas contas.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma conta conectada. Clique em "Sincronizar Agora" para importar suas contas.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Remove Integration Dialog */}
