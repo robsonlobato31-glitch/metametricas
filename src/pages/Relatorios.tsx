@@ -13,6 +13,7 @@ import {
   Building2,
   Megaphone,
   Target,
+  Search,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -109,6 +110,8 @@ const Relatorios = () => {
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
   const [editingTemplate, setEditingTemplate] = useState<SavedReportTemplate | null>(null);
+  const [accountSearch, setAccountSearch] = useState('');
+  const [campaignSearch, setCampaignSearch] = useState('');
 
   const { data: adAccounts } = useAdAccounts();
   const { data: campaigns } = useCampaigns();
@@ -133,6 +136,14 @@ const Relatorios = () => {
     return adAccounts.filter((a) => a.provider === config.provider);
   }, [adAccounts, config.provider]);
 
+  // Filter accounts by search term
+  const searchedAccounts = useMemo(() => {
+    if (!accountSearch.trim()) return filteredAccounts;
+    return filteredAccounts.filter((account) =>
+      account.account_name.toLowerCase().includes(accountSearch.toLowerCase())
+    );
+  }, [filteredAccounts, accountSearch]);
+
   // Filter campaigns by selected accounts, provider, and objectives
   const filteredCampaigns = useMemo(() => {
     if (!campaigns) return [];
@@ -156,6 +167,14 @@ const Relatorios = () => {
     
     return filtered;
   }, [campaigns, config.provider, config.selectedAccountIds, config.selectedObjectives]);
+
+  // Filter campaigns by search term
+  const searchedCampaigns = useMemo(() => {
+    if (!campaignSearch.trim()) return filteredCampaigns;
+    return filteredCampaigns.filter((campaign) =>
+      campaign.name.toLowerCase().includes(campaignSearch.toLowerCase())
+    );
+  }, [filteredCampaigns, campaignSearch]);
 
   const handleAccountToggle = (accountId: string) => {
     setConfig((prev) => {
@@ -426,22 +445,37 @@ const Relatorios = () => {
                       <Building2 className="inline mr-2 h-4 w-4" />
                       Contas ({config.selectedAccountIds.length === 0 ? 'Todas' : config.selectedAccountIds.length})
                     </Label>
+                    <div className="relative mb-1">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar conta..."
+                        value={accountSearch}
+                        onChange={(e) => setAccountSearch(e.target.value)}
+                        className="pl-8 h-9"
+                      />
+                    </div>
                     <div className="border rounded-md p-2 max-h-[120px] overflow-y-auto space-y-1">
-                      {filteredAccounts.map((account) => (
-                        <div key={account.id} className="flex items-center space-x-2 py-1">
-                          <Checkbox
-                            id={`account-${account.id}`}
-                            checked={config.selectedAccountIds.includes(account.id)}
-                            onCheckedChange={() => handleAccountToggle(account.id)}
-                          />
-                          <label
-                            htmlFor={`account-${account.id}`}
-                            className="text-sm font-medium cursor-pointer truncate flex-1"
-                          >
-                            {account.account_name}
-                          </label>
+                      {searchedAccounts.length === 0 ? (
+                        <div className="text-sm text-muted-foreground text-center py-2">
+                          Nenhuma conta encontrada.
                         </div>
-                      ))}
+                      ) : (
+                        searchedAccounts.map((account) => (
+                          <div key={account.id} className="flex items-center space-x-2 py-1">
+                            <Checkbox
+                              id={`account-${account.id}`}
+                              checked={config.selectedAccountIds.includes(account.id)}
+                              onCheckedChange={() => handleAccountToggle(account.id)}
+                            />
+                            <label
+                              htmlFor={`account-${account.id}`}
+                              className="text-sm font-medium cursor-pointer truncate flex-1"
+                            >
+                              {account.account_name}
+                            </label>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
@@ -474,14 +508,34 @@ const Relatorios = () => {
                 )}
 
                 {/* Campaigns */}
-                {filteredCampaigns.length > 0 && (
-                  <div className="grid gap-2">
-                    <Label>
-                      <Megaphone className="inline mr-2 h-4 w-4" />
-                      Campanhas ({config.selectedCampaignIds.length === 0 ? 'Todas' : config.selectedCampaignIds.length})
-                    </Label>
-                    <div className="border rounded-md p-2 max-h-[120px] overflow-y-auto space-y-1">
-                      {filteredCampaigns.map((campaign) => (
+                <div className="grid gap-2">
+                  <Label>
+                    <Megaphone className="inline mr-2 h-4 w-4" />
+                    Campanhas ({config.selectedCampaignIds.length === 0 ? 'Todas' : config.selectedCampaignIds.length})
+                    {(config.selectedAccountIds.length > 0 || config.selectedObjectives.length > 0) && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        (filtrado por {config.selectedAccountIds.length > 0 ? 'conta' : ''}
+                        {config.selectedAccountIds.length > 0 && config.selectedObjectives.length > 0 ? ' e ' : ''}
+                        {config.selectedObjectives.length > 0 ? 'objetivo' : ''})
+                      </span>
+                    )}
+                  </Label>
+                  <div className="relative mb-1">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar campanha..."
+                      value={campaignSearch}
+                      onChange={(e) => setCampaignSearch(e.target.value)}
+                      className="pl-8 h-9"
+                    />
+                  </div>
+                  <div className="border rounded-md p-2 max-h-[120px] overflow-y-auto space-y-1">
+                    {searchedCampaigns.length === 0 ? (
+                      <div className="text-sm text-muted-foreground text-center py-2">
+                        Nenhuma campanha encontrada para os filtros selecionados.
+                      </div>
+                    ) : (
+                      searchedCampaigns.map((campaign) => (
                         <div key={campaign.id} className="flex items-center space-x-2 py-1">
                           <Checkbox
                             id={`campaign-${campaign.id}`}
@@ -495,10 +549,10 @@ const Relatorios = () => {
                             {campaign.name}
                           </label>
                         </div>
-                      ))}
-                    </div>
+                      ))
+                    )}
                   </div>
-                )}
+                </div>
 
                 <Separator />
 
