@@ -26,6 +26,39 @@ const hexToRgb = (hex: string): [number, number, number] => {
     : [59, 130, 246]; // Default blue
 };
 
+// Load image as base64 to avoid CORS issues
+const loadImageAsBase64 = async (url: string): Promise<string | null> => {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch image');
+    const blob = await response.blob();
+    
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Error loading logo:', error);
+    return null;
+  }
+};
+
+// Add footer to all pages
+const addFooterToAllPages = (doc: jsPDF, footerText: string) => {
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  const pageHeight = doc.internal.pageSize.height;
+  
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    const footerLines = doc.splitTextToSize(footerText, 170);
+    doc.text(footerLines, 105, pageHeight - 10, { align: 'center' });
+  }
+};
+
 export const generateReportHeader = async (
   doc: jsPDF,
   title: string,
@@ -40,19 +73,18 @@ export const generateReportHeader = async (
   const primaryColor = options?.primaryColor || '#3B82F6';
   const rgb = hexToRgb(primaryColor);
   
-  // Add logo if provided
+  let logoXOffset = 20;
+  
+  // Add logo if provided - using base64 conversion to avoid CORS
   if (options?.logoUrl) {
-    try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = options.logoUrl!;
-      });
-      doc.addImage(img, 'PNG', 20, startY, 30, 30);
-    } catch (error) {
-      console.error('Error loading logo:', error);
+    const logoBase64 = await loadImageAsBase64(options.logoUrl);
+    if (logoBase64) {
+      try {
+        doc.addImage(logoBase64, 'PNG', 20, startY, 30, 30);
+        logoXOffset = 55;
+      } catch (error) {
+        console.error('Error adding logo to PDF:', error);
+      }
     }
   }
 
@@ -60,15 +92,15 @@ export const generateReportHeader = async (
   doc.setFontSize(20);
   doc.setTextColor(...rgb);
   const headerText = options?.headerText || title;
-  doc.text(headerText, options?.logoUrl ? 55 : 20, startY + 10);
+  doc.text(headerText, logoXOffset, startY + 10);
 
   doc.setFontSize(11);
   doc.setTextColor(100, 100, 100);
-  doc.text(period, options?.logoUrl ? 55 : 20, startY + 18);
+  doc.text(period, logoXOffset, startY + 18);
 
   const now = new Date();
   const generatedText = `Gerado em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
-  doc.text(generatedText, options?.logoUrl ? 55 : 20, startY + 24);
+  doc.text(generatedText, logoXOffset, startY + 24);
 
   doc.setDrawColor(...rgb);
   doc.line(20, startY + 32, 190, startY + 32);
@@ -137,12 +169,12 @@ export const addChartImage = async (
   return startY + imgHeight + 15;
 };
 
+// Updated: Removed status column
 export const addCampaignsTable = (
   doc: jsPDF,
   campaigns: Array<{
     name: string;
     provider: string;
-    status: string;
     spend: string;
     budget: string;
   }>,
@@ -159,8 +191,8 @@ export const addCampaignsTable = (
 
   autoTable(doc, {
     startY: startY + 5,
-    head: [['Nome', 'Plataforma', 'Status', 'Gasto', 'Orçamento']],
-    body: campaigns.map(c => [c.name, c.provider, c.status, c.spend, c.budget]),
+    head: [['Nome', 'Plataforma', 'Gasto', 'Orçamento']],
+    body: campaigns.map(c => [c.name, c.provider, c.spend, c.budget]),
     theme: 'striped',
     headStyles: {
       fillColor: [59, 130, 246],
@@ -181,6 +213,13 @@ export const addCampaignsTable = (
   return (doc as any).lastAutoTable.finalY + 10;
 };
 
+export interface IncludeSections {
+  metrics: boolean;
+  budgetChart: boolean;
+  trendChart: boolean;
+  campaignTable: boolean;
+}
+
 export const exportCampaignReport = async (
   title: string,
   period: string,
@@ -188,7 +227,6 @@ export const exportCampaignReport = async (
   campaigns: Array<{
     name: string;
     provider: string;
-    status: string;
     spend: string;
     budget: string;
   }>,
@@ -202,10 +240,10 @@ export const exportCampaignReport = async (
     secondaryColor?: string;
     headerText?: string;
     footerText?: string;
-  }
+  },
+  includeSections?: IncludeSections
 ) => {
   const doc = new jsPDF();
-  const primaryRgb = template?.primaryColor ? hexToRgb(template.primaryColor) : [59, 130, 246];
 
   let currentY = await generateReportHeader(doc, title, period, 20, {
     logoUrl: template?.logoUrl || undefined,
@@ -213,25 +251,29 @@ export const exportCampaignReport = async (
     headerText: template?.headerText,
   });
 
-  currentY = addMetricsSection(doc, metrics, currentY);
+  // Only add metrics section if enabled and has metrics
+  if (includeSections?.metrics !== false && metrics.length > 0) {
+    currentY = addMetricsSection(doc, metrics, currentY);
+  }
 
-  if (chartIds?.budgetChart) {
+  // Only add budget chart if enabled
+  if (includeSections?.budgetChart !== false && chartIds?.budgetChart) {
     currentY = await addChartImage(doc, chartIds.budgetChart, 'Gasto vs Orçamento', currentY);
   }
 
-  if (chartIds?.trendChart) {
+  // Only add trend chart if enabled
+  if (includeSections?.trendChart !== false && chartIds?.trendChart) {
     currentY = await addChartImage(doc, chartIds.trendChart, 'Evolução de Gastos', currentY);
   }
 
-  currentY = addCampaignsTable(doc, campaigns, currentY);
+  // Only add campaign table if enabled
+  if (includeSections?.campaignTable !== false && campaigns.length > 0) {
+    currentY = addCampaignsTable(doc, campaigns, currentY);
+  }
 
-  // Add footer if provided
+  // Add footer to ALL pages if provided
   if (template?.footerText) {
-    const pageHeight = doc.internal.pageSize.height;
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    const footerLines = doc.splitTextToSize(template.footerText, 170);
-    doc.text(footerLines, 105, pageHeight - 15, { align: 'center' });
+    addFooterToAllPages(doc, template.footerText);
   }
 
   const fileName = `relatorio-campanhas-${new Date().toISOString().split('T')[0]}.pdf`;

@@ -237,27 +237,48 @@ const Relatorios = () => {
       );
     }
 
-    // Calculate metrics
+    // Calculate ALL metrics based on selection
     const metrics: Array<{ label: string; value: string }> = [];
+    const totalImpressions = metricsData?.reduce((acc, m) => acc + (m.impressions || 0), 0) || 0;
+    const totalClicks = metricsData?.reduce((acc, m) => acc + (m.clicks || 0), 0) || 0;
+    const totalSpend = metricsData?.reduce((acc, m) => acc + (m.spend || 0), 0) || 0;
+    const totalResults = metricsData?.reduce((acc, m) => acc + (m.results || 0), 0) || 0;
+    const totalMessages = metricsData?.reduce((acc, m) => acc + (m.messages || 0), 0) || 0;
+    const totalConversions = metricsData?.reduce((acc, m) => acc + (m.conversions || 0), 0) || 0;
+
     if (config.selectedMetrics.impressions) {
-      const total = metricsData?.reduce((acc, m) => acc + (m.impressions || 0), 0) || 0;
-      metrics.push({ label: 'Impressões', value: total.toLocaleString('pt-BR') });
+      metrics.push({ label: 'Impressões', value: totalImpressions.toLocaleString('pt-BR') });
     }
     if (config.selectedMetrics.clicks) {
-      const total = metricsData?.reduce((acc, m) => acc + (m.clicks || 0), 0) || 0;
-      metrics.push({ label: 'Cliques', value: total.toLocaleString('pt-BR') });
+      metrics.push({ label: 'Cliques', value: totalClicks.toLocaleString('pt-BR') });
+    }
+    if (config.selectedMetrics.ctr) {
+      const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions * 100) : 0;
+      metrics.push({ label: 'CTR', value: `${ctr.toFixed(2)}%` });
+    }
+    if (config.selectedMetrics.cpc) {
+      const cpc = totalClicks > 0 ? (totalSpend / totalClicks) : 0;
+      metrics.push({ label: 'CPC', value: `R$ ${cpc.toFixed(2)}` });
     }
     if (config.selectedMetrics.spend) {
-      const total = metricsData?.reduce((acc, m) => acc + (m.spend || 0), 0) || 0;
-      metrics.push({ label: 'Gasto Total', value: `R$ ${total.toFixed(2)}` });
+      metrics.push({ label: 'Gasto Total', value: `R$ ${totalSpend.toFixed(2)}` });
+    }
+    if (config.selectedMetrics.conversions) {
+      metrics.push({ label: 'Conversões', value: totalConversions.toLocaleString('pt-BR') });
     }
     if (config.selectedMetrics.results) {
-      const total = metricsData?.reduce((acc, m) => acc + (m.results || 0), 0) || 0;
-      metrics.push({ label: 'Resultados', value: total.toLocaleString('pt-BR') });
+      metrics.push({ label: 'Resultados', value: totalResults.toLocaleString('pt-BR') });
+    }
+    if (config.selectedMetrics.cost_per_result) {
+      const cpr = totalResults > 0 ? (totalSpend / totalResults) : 0;
+      metrics.push({ label: 'Custo/Resultado', value: `R$ ${cpr.toFixed(2)}` });
     }
     if (config.selectedMetrics.messages) {
-      const total = metricsData?.reduce((acc, m) => acc + (m.messages || 0), 0) || 0;
-      metrics.push({ label: 'Mensagens', value: total.toLocaleString('pt-BR') });
+      metrics.push({ label: 'Mensagens', value: totalMessages.toLocaleString('pt-BR') });
+    }
+    if (config.selectedMetrics.cost_per_message) {
+      const cpm = totalMessages > 0 ? (totalSpend / totalMessages) : 0;
+      metrics.push({ label: 'Custo/Mensagem', value: `R$ ${cpm.toFixed(2)}` });
     }
 
     await exportReport({
@@ -267,7 +288,6 @@ const Relatorios = () => {
       campaigns: exportCampaigns.map((c) => ({
         name: c.name,
         provider: c.ad_accounts?.provider || 'N/A',
-        status: c.status,
         spend: `R$ ${(metricsData?.find((m) => m.campaign_id === c.id)?.spend || 0).toFixed(2)}`,
         budget: c.budget ? `R$ ${c.budget.toFixed(2)}` : 'N/A',
       })),
@@ -275,6 +295,7 @@ const Relatorios = () => {
         budgetChart: config.includeSections.budgetChart ? 'budget-chart' : undefined,
         trendChart: config.includeSections.trendChart ? 'trend-chart' : undefined,
       },
+      includeSections: config.includeSections,
     });
 
     setShowCharts(false);
