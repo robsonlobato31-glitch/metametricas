@@ -28,7 +28,7 @@ export default function AlertaGasto() {
   const [isSyncingMeta, setIsSyncingMeta] = useState(false);
   const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'orange' | 'red'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
 
   // Clear new alerts count when component mounts
   useEffect(() => {
@@ -109,16 +109,14 @@ export default function AlertaGasto() {
     }).format(value);
   };
 
-  const getStatusCategory = (percentage: number): 'green' | 'yellow' | 'orange' | 'red' => {
+  const getStatusCategory = (percentage: number): 'green' | 'yellow' | 'red' => {
     if (percentage >= 100) return 'red';
-    if (percentage >= 90) return 'orange';
     if (percentage >= 80) return 'yellow';
     return 'green';
   };
 
   const getProgressBarColor = (percentage: number) => {
     if (percentage >= 100) return 'bg-destructive';
-    if (percentage >= 90) return 'bg-orange-500';
     if (percentage >= 80) return 'bg-yellow-500';
     return 'bg-green-500';
   };
@@ -249,18 +247,7 @@ export default function AlertaGasto() {
               }`}
             >
               <div className="w-2 h-2 rounded-full bg-yellow-500" />
-              80% - 89%
-            </button>
-            <button
-              onClick={() => setStatusFilter('orange')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors ${
-                statusFilter === 'orange' 
-                  ? 'bg-orange-500 text-white' 
-                  : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <div className="w-2 h-2 rounded-full bg-orange-500" />
-              90% - 99%
+              80% - 99%
             </button>
             <button
               onClick={() => setStatusFilter('red')}
@@ -357,18 +344,6 @@ export default function AlertaGasto() {
                         <span>80%</span>
                       </div>
                       
-                      {/* 90% indicator */}
-                      <div className={`flex items-center gap-1 text-xs ${
-                        percentage >= 90 ? 'text-orange-600 dark:text-orange-500' : 'text-muted-foreground'
-                      }`}>
-                        <div className={`w-2.5 h-2.5 rounded-full border-2 ${
-                          percentage >= 90 
-                            ? 'bg-orange-500 border-orange-500' 
-                            : 'bg-transparent border-muted-foreground/50'
-                        }`} />
-                        <span>90%</span>
-                      </div>
-                      
                       {/* 100% indicator */}
                       <div className={`flex items-center gap-1 text-xs ${
                         percentage >= 100 ? 'text-destructive' : 'text-muted-foreground'
@@ -387,11 +362,6 @@ export default function AlertaGasto() {
                       <div className="flex items-center gap-1 text-xs text-destructive">
                         <AlertTriangle className="h-3 w-3" />
                         <span>Excedido: {formatCurrency((alert.current_amount || 0) - monthlyBudget)}</span>
-                      </div>
-                    ) : percentage >= 90 ? (
-                      <div className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-500">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span>Atenção: 90% do orçamento atingido</span>
                       </div>
                     ) : percentage >= 80 && (
                       <div className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500">
@@ -425,7 +395,7 @@ export default function AlertaGasto() {
           <CardTitle>Como Funciona</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>• Cada card representa uma campanha única com 3 indicadores de alerta (80%, 90%, 100%)</p>
+          <p>• Cada card representa uma campanha única com 2 indicadores de alerta (80%, 100%)</p>
           <p>• Os indicadores são ativados automaticamente conforme o gasto atinge cada threshold</p>
           <p>• Notificações em tempo real serão exibidas quando novos alertas forem gerados</p>
           <p>• Configure orçamentos nas configurações de cada campanha</p>
