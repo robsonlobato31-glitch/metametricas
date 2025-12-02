@@ -9,7 +9,8 @@ import {
   Users,
   LogOut,
   Building2,
-  CreditCard
+  CreditCard,
+  FileText
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -37,6 +38,7 @@ const mainItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
   { title: 'Campanhas', url: '/campanhas', icon: Target },
   { title: 'Métricas', url: '/metricas', icon: BarChart3 },
+  { title: 'Relatórios', url: '/relatorios', icon: FileText },
 ];
 
 const integrationItems = [

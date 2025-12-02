@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Calendar, Download, Building2, Megaphone } from 'lucide-react';
+import { Calendar, Download, Building2, Megaphone, Target } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,23 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+const OBJECTIVE_LABELS: Record<string, string> = {
+  REACH: 'Alcance',
+  OUTCOME_TRAFFIC: 'Tráfego',
+  OUTCOME_SALES: 'Vendas',
+  OUTCOME_ENGAGEMENT: 'Engajamento',
+  OUTCOME_LEADS: 'Leads',
+  PAGE_LIKES: 'Curtidas na Página',
+  VIDEO_VIEWS: 'Visualizações de Vídeo',
+  LINK_CLICKS: 'Cliques no Link',
+  CONVERSIONS: 'Conversões',
+  POST_ENGAGEMENT: 'Engajamento no Post',
+  LEAD_GENERATION: 'Geração de Leads',
+  OUTCOME_AWARENESS: 'Reconhecimento',
+  BRAND_AWARENESS: 'Reconhecimento de Marca',
+  MESSAGES: 'Mensagens',
+};
+
 interface AdAccount {
   id: string;
   name: string;
@@ -30,6 +47,7 @@ interface Campaign {
   id: string;
   name: string;
   accountId?: string;
+  objective?: string;
 }
 
 interface ExportReportDialogProps {
@@ -37,6 +55,7 @@ interface ExportReportDialogProps {
   isLoading?: boolean;
   availableAccounts?: AdAccount[];
   availableCampaigns?: Campaign[];
+  availableObjectives?: string[];
 }
 
 export interface ExportConfig {
@@ -44,6 +63,7 @@ export interface ExportConfig {
   provider: 'all' | 'meta' | 'google';
   selectedAccountIds: string[];
   selectedCampaignIds: string[];
+  selectedObjectives: string[];
   includeSections: {
     metrics: boolean;
     budgetChart: boolean;
@@ -69,6 +89,7 @@ export const ExportReportDialog = ({
   isLoading,
   availableAccounts = [],
   availableCampaigns = [],
+  availableObjectives = [],
 }: ExportReportDialogProps) => {
   const [open, setOpen] = useState(false);
   const [config, setConfig] = useState<ExportConfig>({
@@ -76,6 +97,7 @@ export const ExportReportDialog = ({
     provider: 'all',
     selectedAccountIds: [],
     selectedCampaignIds: [],
+    selectedObjectives: [],
     includeSections: {
       metrics: true,
       budgetChart: true,
@@ -102,7 +124,7 @@ export const ExportReportDialog = ({
     return availableAccounts.filter((a) => a.provider === config.provider);
   }, [availableAccounts, config.provider]);
 
-  // Filter campaigns by selected accounts and provider
+  // Filter campaigns by selected accounts, provider, and objectives
   const filteredCampaigns = useMemo(() => {
     let filtered = availableCampaigns;
     if (config.selectedAccountIds.length > 0) {
@@ -110,8 +132,37 @@ export const ExportReportDialog = ({
         config.selectedAccountIds.includes(c.accountId || '')
       );
     }
+    if (config.selectedObjectives.length > 0) {
+      filtered = filtered.filter((c) =>
+        c.objective && config.selectedObjectives.includes(c.objective)
+      );
+    }
     return filtered;
-  }, [availableCampaigns, config.selectedAccountIds]);
+  }, [availableCampaigns, config.selectedAccountIds, config.selectedObjectives]);
+
+  const handleObjectiveToggle = (objective: string) => {
+    setConfig((prev) => {
+      const isSelected = prev.selectedObjectives.includes(objective);
+      return {
+        ...prev,
+        selectedObjectives: isSelected
+          ? prev.selectedObjectives.filter((o) => o !== objective)
+          : [...prev.selectedObjectives, objective],
+        selectedCampaignIds: [],
+      };
+    });
+  };
+
+  const handleSelectAllObjectives = () => {
+    setConfig((prev) => ({
+      ...prev,
+      selectedObjectives:
+        prev.selectedObjectives.length === availableObjectives.length
+          ? []
+          : [...availableObjectives],
+      selectedCampaignIds: [],
+    }));
+  };
 
   const handleAccountToggle = (accountId: string) => {
     setConfig((prev) => {
@@ -265,6 +316,48 @@ export const ExportReportDialog = ({
                         className="text-sm font-medium leading-none cursor-pointer truncate flex-1"
                       >
                         {account.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Objective Selection */}
+            {availableObjectives.length > 0 && (
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label>
+                    <Target className="inline mr-2 h-4 w-4" />
+                    Objetivos ({config.selectedObjectives.length === 0 ? 'Todos' : config.selectedObjectives.length})
+                  </Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={handleSelectAllObjectives}
+                  >
+                    {config.selectedObjectives.length === availableObjectives.length
+                      ? 'Desmarcar todos'
+                      : 'Selecionar todos'}
+                  </Button>
+                </div>
+                <div className="border rounded-md p-2 max-h-[120px] overflow-y-auto space-y-1">
+                  {availableObjectives.map((objective) => (
+                    <div
+                      key={objective}
+                      className="flex items-center space-x-2 py-1"
+                    >
+                      <Checkbox
+                        id={`objective-${objective}`}
+                        checked={config.selectedObjectives.includes(objective)}
+                        onCheckedChange={() => handleObjectiveToggle(objective)}
+                      />
+                      <label
+                        htmlFor={`objective-${objective}`}
+                        className="text-sm font-medium leading-none cursor-pointer truncate flex-1"
+                      >
+                        {OBJECTIVE_LABELS[objective] || objective}
                       </label>
                     </div>
                   ))}
