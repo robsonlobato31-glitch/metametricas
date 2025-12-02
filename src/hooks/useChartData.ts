@@ -15,12 +15,19 @@ export const useChartData = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: ['chart-data', user?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
-
       // Últimos 7 dias (hoje e os 6 dias anteriores)
       const today = new Date();
       const sevenDaysAgo = subDays(today, 6);
+      const daysOfWeek = eachDayOfInterval({ start: sevenDaysAgo, end: today });
       
+      // Estrutura padrão com 0 para cada dia
+      const emptyChart: ChartDataPoint[] = daysOfWeek.map(day => ({
+        name: format(day, 'EEE', { locale: ptBR }),
+        value: 0,
+      }));
+
+      if (!user?.id) return emptyChart;
+
       // Step 1: Buscar integrations do usuário
       const { data: integrations, error: intError } = await supabase
         .from('integrations')
@@ -28,7 +35,7 @@ export const useChartData = () => {
         .eq('user_id', user.id);
 
       if (intError) throw intError;
-      if (!integrations || integrations.length === 0) return [];
+      if (!integrations || integrations.length === 0) return emptyChart;
 
       const integrationIds = integrations.map(i => i.id);
 
@@ -39,7 +46,7 @@ export const useChartData = () => {
         .in('integration_id', integrationIds);
 
       if (aaError) throw aaError;
-      if (!adAccounts || adAccounts.length === 0) return [];
+      if (!adAccounts || adAccounts.length === 0) return emptyChart;
 
       const adAccountIds = adAccounts.map(aa => aa.id);
 
@@ -50,7 +57,7 @@ export const useChartData = () => {
         .in('ad_account_id', adAccountIds);
 
       if (campError) throw campError;
-      if (!campaigns || campaigns.length === 0) return [];
+      if (!campaigns || campaigns.length === 0) return emptyChart;
 
       const campaignIds = campaigns.map(c => c.id);
 
@@ -66,13 +73,11 @@ export const useChartData = () => {
       if (metricsError) throw metricsError;
 
       // Agrupar por dia
-      const daysOfWeek = eachDayOfInterval({ start: sevenDaysAgo, end: today });
-      
       const chartData: ChartDataPoint[] = daysOfWeek.map(day => {
         const dayStr = format(day, 'yyyy-MM-dd');
         const dayMetrics = metrics?.filter(m => m.date === dayStr) || [];
         
-        const totalSpend = dayMetrics.reduce((sum, m) => sum + (m.spend || 0), 0);
+        const totalSpend = dayMetrics.reduce((sum, m) => sum + (Number(m.spend) || 0), 0);
         
         return {
           name: format(day, 'EEE', { locale: ptBR }),
