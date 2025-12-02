@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,7 @@ import { AdvancedFilters, AdvancedFiltersConfig } from '@/components/filters/Adv
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useSyncMetrics } from '@/hooks/useSyncMetrics';
 import { TrendIndicator } from '@/components/TrendIndicator';
-import { subDays } from 'date-fns';
+import { subDays, differenceInDays } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CampaignAnalytics } from '@/components/campaigns/CampaignAnalytics';
 
@@ -67,6 +67,15 @@ export default function Campanhas() {
   const [compareDateRange, setCompareDateRange] = useState<{ from: Date; to: Date } | null>(null);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersConfig>({});
 
+  // Auto-calculate previous period (same duration as main period)
+  const autoPreviousPeriod = useMemo(() => {
+    const duration = differenceInDays(dateRange.to, dateRange.from);
+    return {
+      from: subDays(dateRange.from, duration + 1),
+      to: subDays(dateRange.from, 1),
+    };
+  }, [dateRange]);
+
   const { data: campaigns, isLoading, refetch } = useCampaignMetrics({
     search,
     provider,
@@ -76,6 +85,26 @@ export default function Campanhas() {
     dateTo: dateRange.to,
     ...advancedFilters,
   });
+
+  // Fetch comparison data for trend indicators
+  const { data: comparisonCampaigns } = useCampaignMetrics({
+    search,
+    provider,
+    status,
+    accountId,
+    dateFrom: autoPreviousPeriod.from,
+    dateTo: autoPreviousPeriod.to,
+    ...advancedFilters,
+  });
+
+  // Create map of campaign_id -> CTR from previous period
+  const previousCtrMap = useMemo(() => {
+    if (!comparisonCampaigns) return {};
+    return comparisonCampaigns.reduce((acc, c) => {
+      acc[c.campaign_id] = c.ctr;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [comparisonCampaigns]);
 
   const { exportReport, isExporting } = useExportReport();
   const { syncMeta, syncGoogle, isLoading: isSyncing } = useSyncMetrics();
@@ -405,10 +434,10 @@ export default function Campanhas() {
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             {formatPercentage(campaign.ctr)}
-                            {campaign.ctr !== null && campaign.ctr !== undefined && (
+                            {campaign.ctr !== null && campaign.ctr !== undefined && previousCtrMap[campaign.campaign_id] !== undefined && (
                               <TrendIndicator 
                                 currentValue={campaign.ctr || 0}
-                                previousValue={campaign.ctr ? campaign.ctr * 0.9 : 0}
+                                previousValue={previousCtrMap[campaign.campaign_id] ?? campaign.ctr}
                                 showPercentage={false}
                               />
                             )}
