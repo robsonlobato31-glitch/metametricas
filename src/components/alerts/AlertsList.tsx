@@ -46,17 +46,17 @@ interface AlertItemProps {
 
 const AlertItem = ({ alert, onToggle, onDelete, isDeleting }: AlertItemProps) => {
   return (
-    <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+    <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors">
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <Bell className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium truncate">{alert.name}</span>
+        <div className="flex items-center gap-2">
+          <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="font-medium text-sm truncate">{alert.name}</span>
           {alert.send_email && (
             <Mail className="h-3 w-3 text-muted-foreground" />
           )}
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="outline" className="text-xs">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+          <Badge variant="outline" className="text-xs py-0 h-5">
             {METRIC_LABELS[alert.metric_type] || alert.metric_type}
           </Badge>
           <span className="flex items-center gap-1">
@@ -67,7 +67,7 @@ const AlertItem = ({ alert, onToggle, onDelete, isDeleting }: AlertItemProps) =>
           <span>{formatCurrency(alert.threshold_amount)}</span>
         </div>
       </div>
-      <div className="flex items-center gap-3 ml-4">
+      <div className="flex items-center gap-2 ml-3">
         <Switch
           checked={alert.is_active}
           onCheckedChange={(checked) => onToggle(alert.id, checked)}
@@ -77,10 +77,10 @@ const AlertItem = ({ alert, onToggle, onDelete, isDeleting }: AlertItemProps) =>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-destructive hover:text-destructive"
+              className="h-7 w-7 text-destructive hover:text-destructive"
               disabled={isDeleting}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -120,12 +120,12 @@ export const AlertsList = () => {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="text-lg">Alertas Configurados</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-20 w-full" />
+            <Skeleton key={i} className="h-14 w-full" />
           ))}
         </CardContent>
       </Card>
@@ -134,18 +134,18 @@ export const AlertsList = () => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="text-lg">
           Alertas Configurados ({alerts.length})
         </CardTitle>
       </CardHeader>
       <CardContent>
         {alerts.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">
+          <p className="text-center text-muted-foreground py-4 text-sm">
             Nenhum alerta configurado ainda. Crie seu primeiro alerta!
           </p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {alerts.map((alert) => (
               <AlertItem
                 key={alert.id}
