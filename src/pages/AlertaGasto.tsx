@@ -28,6 +28,7 @@ export default function AlertaGasto() {
   const [isSyncingMeta, setIsSyncingMeta] = useState(false);
   const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
 
   // Clear new alerts count when component mounts
   useEffect(() => {
@@ -207,20 +208,51 @@ export default function AlertaGasto() {
             <CardDescription>
               Campanhas que requerem atenção imediata
             </CardDescription>
-            {/* Legenda de cores */}
-            <div className="flex flex-wrap gap-4 mt-3 text-xs">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="text-muted-foreground">&lt; 80%</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                <span className="text-muted-foreground">80% - 94%</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-destructive" />
-                <span className="text-muted-foreground">≥ 95%</span>
-              </div>
+            {/* Filtros de status */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors ${
+                  statusFilter === 'all' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => setStatusFilter('green')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors ${
+                  statusFilter === 'green' 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                &lt; 80%
+              </button>
+              <button
+                onClick={() => setStatusFilter('yellow')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors ${
+                  statusFilter === 'yellow' 
+                    ? 'bg-yellow-500 text-white' 
+                    : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                80% - 94%
+              </button>
+              <button
+                onClick={() => setStatusFilter('red')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors ${
+                  statusFilter === 'red' 
+                    ? 'bg-destructive text-destructive-foreground' 
+                    : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <div className="w-2 h-2 rounded-full bg-destructive" />
+                ≥ 95%
+              </button>
             </div>
           </CardHeader>
           <CardContent>
@@ -236,7 +268,19 @@ export default function AlertaGasto() {
               </div>
             ) : alerts.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {alerts.map((alert) => {
+                {alerts
+                  .filter((alert) => {
+                    if (statusFilter === 'all') return true;
+                    const dailyBudget = alert.campaigns.daily_budget || alert.threshold_amount;
+                    const monthlyBudget = dailyBudget * 30;
+                    const percentage = monthlyBudget > 0 ? (alert.current_amount / monthlyBudget) * 100 : 0;
+                    
+                    if (statusFilter === 'green') return percentage < 80;
+                    if (statusFilter === 'yellow') return percentage >= 80 && percentage < 95;
+                    if (statusFilter === 'red') return percentage >= 95;
+                    return true;
+                  })
+                  .map((alert) => {
                   const dailyBudget = alert.campaigns.daily_budget || alert.threshold_amount;
                   const monthlyBudget = dailyBudget * 30;
                   const accountName = alert.campaigns.ad_accounts?.account_name || 'Conta não identificada';
