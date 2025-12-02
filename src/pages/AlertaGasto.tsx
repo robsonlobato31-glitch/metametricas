@@ -209,7 +209,7 @@ export default function AlertaGasto() {
             {isLoading ? (
               <Skeleton className="h-6 w-32" />
             ) : (
-              `${campaigns.length} Campanha(s) Monitorada(s)`
+              `${campaigns.length} Campanha(s) Monitorada(s) com Alerta`
             )}
           </CardTitle>
           <CardDescription>

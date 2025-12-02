@@ -23,73 +23,63 @@ export const useMonitoredCampaigns = () => {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Get all active campaigns with daily_budget for this user
-      const { data: campaignsData, error: campaignsError } = await supabase
-        .from('campaigns')
+      // Get only campaigns that have active alerts (triggered)
+      const { data: alertsData, error: alertsError } = await supabase
+        .from('campaign_alerts')
         .select(`
-          id,
-          name,
-          status,
-          daily_budget,
-          updated_at,
-          ad_accounts!inner(
-            account_name,
-            provider,
-            integrations!inner(
-              user_id
+          campaign_id,
+          current_amount,
+          threshold_amount,
+          triggered_at,
+          campaigns!inner(
+            id,
+            name,
+            status,
+            daily_budget,
+            ad_accounts!inner(
+              account_name,
+              provider,
+              integrations!inner(
+                user_id
+              )
             )
           )
         `)
-        .eq('status', 'ACTIVE')
-        .not('daily_budget', 'is', null)
-        .gt('daily_budget', 0)
-        .eq('ad_accounts.integrations.user_id', user.id);
+        .eq('is_active', true)
+        .eq('campaigns.ad_accounts.integrations.user_id', user.id)
+        .order('triggered_at', { ascending: false });
 
-      if (campaignsError) throw campaignsError;
-      if (!campaignsData || campaignsData.length === 0) return [];
+      if (alertsError) throw alertsError;
+      if (!alertsData || alertsData.length === 0) return [];
 
-      // Get campaign IDs
-      const campaignIds = campaignsData.map(c => c.id);
+      // Group by campaign_id to get unique campaigns with alerts
+      const campaignMap = new Map<string, MonitoredCampaign>();
+      
+      alertsData.forEach((alert) => {
+        const campaign = alert.campaigns as any;
+        if (!campaign || campaignMap.has(alert.campaign_id)) return;
 
-      // Fetch total spend for each campaign from metrics
-      const { data: metricsData, error: metricsError } = await supabase
-        .from('metrics')
-        .select('campaign_id, spend')
-        .in('campaign_id', campaignIds);
-
-      if (metricsError) throw metricsError;
-
-      // Calculate total spend per campaign
-      const spendByCampaign = new Map<string, number>();
-      (metricsData || []).forEach((metric) => {
-        const currentSpend = spendByCampaign.get(metric.campaign_id) || 0;
-        spendByCampaign.set(metric.campaign_id, currentSpend + (Number(metric.spend) || 0));
-      });
-
-      // Map to MonitoredCampaign format
-      const now = new Date().toISOString();
-      const result: MonitoredCampaign[] = campaignsData.map((campaign) => {
         const dailyBudget = Number(campaign.daily_budget) || 0;
         const monthlyBudget = dailyBudget * 30;
-        const currentSpend = spendByCampaign.get(campaign.id) || 0;
+        const currentSpend = Number(alert.current_amount) || 0;
         const percentage = monthlyBudget > 0 ? (currentSpend / monthlyBudget) * 100 : 0;
 
-        return {
-          campaign_id: campaign.id,
+        campaignMap.set(alert.campaign_id, {
+          campaign_id: alert.campaign_id,
           campaign_name: campaign.name,
           status: campaign.status,
           daily_budget: dailyBudget,
           monthly_budget: monthlyBudget,
           current_spend: currentSpend,
           percentage,
-          account_name: (campaign.ad_accounts as any)?.account_name || 'Conta não identificada',
-          provider: (campaign.ad_accounts as any)?.provider || 'unknown',
-          updated_at: now,
-        };
+          account_name: campaign.ad_accounts?.account_name || 'Conta não identificada',
+          provider: campaign.ad_accounts?.provider || 'unknown',
+          updated_at: alert.triggered_at,
+        });
       });
 
       // Sort by percentage descending (highest risk first)
-      return result.sort((a, b) => b.percentage - a.percentage);
+      return Array.from(campaignMap.values()).sort((a, b) => b.percentage - a.percentage);
     },
     enabled: !!user?.id,
   });
