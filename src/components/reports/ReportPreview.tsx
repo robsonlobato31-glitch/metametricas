@@ -1,0 +1,279 @@
+import { format, subDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { FileText } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
+import type { ExportConfig } from '@/components/reports/ExportReportDialog';
+import { useReportTemplate } from '@/hooks/useReportTemplate';
+
+interface Campaign {
+  id: string;
+  name: string;
+  status: string;
+  budget?: number | null;
+  campaign_id: string;
+  ad_accounts?: {
+    provider: string;
+  } | null;
+}
+
+interface MetricData {
+  campaign_id: string;
+  campaign_name: string;
+  spend?: number | null;
+  impressions?: number | null;
+  clicks?: number | null;
+  budget?: number | null;
+  results?: number | null;
+  messages?: number | null;
+}
+
+interface ReportPreviewProps {
+  config: ExportConfig;
+  campaigns: Campaign[];
+  metricsData: MetricData[];
+}
+
+const METRIC_LABELS: Record<string, string> = {
+  impressions: 'Impressões',
+  clicks: 'Cliques',
+  ctr: 'CTR',
+  cpc: 'CPC',
+  spend: 'Gasto Total',
+  conversions: 'Conversões',
+  results: 'Resultados',
+  cost_per_result: 'Custo/Resultado',
+  messages: 'Mensagens',
+  cost_per_message: 'Custo/Mensagem',
+};
+
+export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewProps) => {
+  const { template } = useReportTemplate();
+  
+  const days = parseInt(config.period);
+  const dateFrom = subDays(new Date(), days);
+  const dateTo = new Date();
+  const periodText = `${format(dateFrom, 'dd/MM/yyyy', { locale: ptBR })} - ${format(dateTo, 'dd/MM/yyyy', { locale: ptBR })}`;
+
+  // Filter campaigns based on config
+  let displayCampaigns = campaigns;
+  if (config.selectedCampaignIds.length > 0) {
+    displayCampaigns = campaigns.filter((c) =>
+      config.selectedCampaignIds.includes(c.campaign_id)
+    );
+  }
+
+  // Calculate metrics
+  const calculateMetrics = () => {
+    const metrics: Array<{ label: string; value: string }> = [];
+    
+    if (config.selectedMetrics.impressions) {
+      const total = metricsData?.reduce((acc, m) => acc + (m.impressions || 0), 0) || 0;
+      metrics.push({ label: 'Impressões', value: total.toLocaleString('pt-BR') });
+    }
+    if (config.selectedMetrics.clicks) {
+      const total = metricsData?.reduce((acc, m) => acc + (m.clicks || 0), 0) || 0;
+      metrics.push({ label: 'Cliques', value: total.toLocaleString('pt-BR') });
+    }
+    if (config.selectedMetrics.spend) {
+      const total = metricsData?.reduce((acc, m) => acc + (m.spend || 0), 0) || 0;
+      metrics.push({ label: 'Gasto Total', value: `R$ ${total.toFixed(2)}` });
+    }
+    if (config.selectedMetrics.results) {
+      const total = metricsData?.reduce((acc, m) => acc + (m.results || 0), 0) || 0;
+      metrics.push({ label: 'Resultados', value: total.toLocaleString('pt-BR') });
+    }
+    if (config.selectedMetrics.messages) {
+      const total = metricsData?.reduce((acc, m) => acc + (m.messages || 0), 0) || 0;
+      metrics.push({ label: 'Mensagens', value: total.toLocaleString('pt-BR') });
+    }
+    
+    return metrics;
+  };
+
+  const metrics = calculateMetrics();
+
+  // Chart data
+  const chartData = metricsData?.slice(0, 8).map((m, index) => ({
+    name: m.campaign_name.substring(0, 12) + (m.campaign_name.length > 12 ? '...' : ''),
+    spend: m.spend || 0,
+    budget: m.budget || 0,
+    impressions: m.impressions || 0,
+    clicks: m.clicks || 0,
+  })) || [];
+
+  const primaryColor = template?.primary_color || '#3B82F6';
+  const secondaryColor = template?.secondary_color || '#10B981';
+
+  return (
+    <ScrollArea className="h-[600px] w-full">
+      <div className="bg-white text-black p-6 min-h-full" style={{ fontFamily: 'Arial, sans-serif' }}>
+        {/* PDF Header Simulation */}
+        <div className="mb-6 pb-4 border-b-2" style={{ borderColor: primaryColor }}>
+          <div className="flex items-center gap-4">
+            {template?.logo_url && (
+              <img 
+                src={template.logo_url} 
+                alt="Logo" 
+                className="h-12 w-auto object-contain"
+              />
+            )}
+            <div>
+              <h1 className="text-2xl font-bold" style={{ color: primaryColor }}>
+                {template?.header_text || 'Relatório de Campanhas'}
+              </h1>
+              <p className="text-sm text-gray-600">Período: {periodText}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Metrics Section */}
+        {config.includeSections.metrics && metrics.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3" style={{ color: primaryColor }}>
+              Resumo de Métricas
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              {metrics.map((metric, index) => (
+                <Card key={index} className="p-3 bg-gray-50">
+                  <p className="text-xs text-gray-500">{metric.label}</p>
+                  <p className="text-lg font-bold" style={{ color: primaryColor }}>
+                    {metric.value}
+                  </p>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Budget Chart */}
+        {config.includeSections.budgetChart && chartData.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3" style={{ color: primaryColor }}>
+              Orçamento vs Gasto
+            </h2>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="spend" name="Gasto" fill={primaryColor} />
+                  <Bar dataKey="budget" name="Orçamento" fill={secondaryColor} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Trend Chart */}
+        {config.includeSections.trendChart && chartData.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3" style={{ color: primaryColor }}>
+              Evolução de Métricas
+            </h2>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Line yAxisId="left" type="monotone" dataKey="impressions" name="Impressões" stroke={primaryColor} />
+                  <Line yAxisId="left" type="monotone" dataKey="clicks" name="Cliques" stroke={secondaryColor} />
+                  <Line yAxisId="right" type="monotone" dataKey="spend" name="Gasto" stroke="#F59E0B" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Campaigns Table */}
+        {config.includeSections.campaignTable && displayCampaigns.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3" style={{ color: primaryColor }}>
+              Campanhas
+            </h2>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-black">Campanha</TableHead>
+                  <TableHead className="text-black">Plataforma</TableHead>
+                  <TableHead className="text-black">Status</TableHead>
+                  <TableHead className="text-black text-right">Gasto</TableHead>
+                  <TableHead className="text-black text-right">Orçamento</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {displayCampaigns.slice(0, 10).map((campaign) => {
+                  const campaignMetrics = metricsData?.find(m => m.campaign_id === campaign.id);
+                  return (
+                    <TableRow key={campaign.id}>
+                      <TableCell className="font-medium text-black">{campaign.name}</TableCell>
+                      <TableCell className="text-black">{campaign.ad_accounts?.provider || 'N/A'}</TableCell>
+                      <TableCell className="text-black">{campaign.status}</TableCell>
+                      <TableCell className="text-right text-black">
+                        R$ {(campaignMetrics?.spend || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right text-black">
+                        {campaign.budget ? `R$ ${campaign.budget.toFixed(2)}` : 'N/A'}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            {displayCampaigns.length > 10 && (
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                ... e mais {displayCampaigns.length - 10} campanhas
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Footer */}
+        {template?.footer_text && (
+          <div className="mt-8 pt-4 border-t text-center">
+            <p className="text-xs text-gray-500">{template.footer_text}</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!config.includeSections.metrics && 
+         !config.includeSections.budgetChart && 
+         !config.includeSections.trendChart && 
+         !config.includeSections.campaignTable && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <FileText className="h-16 w-16 text-gray-300 mb-4" />
+            <p className="text-gray-500">Selecione pelo menos uma seção para incluir no relatório.</p>
+          </div>
+        )}
+      </div>
+    </ScrollArea>
+  );
+};
