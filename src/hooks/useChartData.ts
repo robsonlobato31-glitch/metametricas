@@ -21,21 +21,43 @@ export const useChartData = () => {
       const today = new Date();
       const sevenDaysAgo = subDays(today, 6);
       
-      // Buscar todas as campanhas do usuário
-      const { data: campaigns, error: campaignsError } = await supabase
-        .from('campaigns')
-        .select('id, ad_account_id, ad_accounts!inner(integration_id, integrations!inner(user_id))')
-        .eq('ad_accounts.integrations.user_id', user.id);
+      // Step 1: Buscar integrations do usuário
+      const { data: integrations, error: intError } = await supabase
+        .from('integrations')
+        .select('id')
+        .eq('user_id', user.id);
 
-      if (campaignsError) throw campaignsError;
+      if (intError) throw intError;
+      if (!integrations || integrations.length === 0) return [];
+
+      const integrationIds = integrations.map(i => i.id);
+
+      // Step 2: Buscar ad_accounts dessas integrations
+      const { data: adAccounts, error: aaError } = await supabase
+        .from('ad_accounts')
+        .select('id')
+        .in('integration_id', integrationIds);
+
+      if (aaError) throw aaError;
+      if (!adAccounts || adAccounts.length === 0) return [];
+
+      const adAccountIds = adAccounts.map(aa => aa.id);
+
+      // Step 3: Buscar campaigns dessas ad_accounts
+      const { data: campaigns, error: campError } = await supabase
+        .from('campaigns')
+        .select('id')
+        .in('ad_account_id', adAccountIds);
+
+      if (campError) throw campError;
       if (!campaigns || campaigns.length === 0) return [];
 
       const campaignIds = campaigns.map(c => c.id);
 
-      // Buscar métricas dos últimos 7 dias
+      // Step 4: Buscar métricas dos últimos 7 dias
       const { data: metrics, error: metricsError } = await supabase
         .from('metrics')
-        .select('date, spend, clicks, impressions, conversions')
+        .select('date, spend')
         .in('campaign_id', campaignIds)
         .gte('date', format(sevenDaysAgo, 'yyyy-MM-dd'))
         .lte('date', format(today, 'yyyy-MM-dd'))
