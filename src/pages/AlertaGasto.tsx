@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle, RefreshCw, ChevronDown, Loader2, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useCampaignAlerts, GroupedCampaignAlert } from '@/hooks/useCampaignAlerts';
+import { useMonitoredCampaigns } from '@/hooks/useMonitoredCampaigns';
 import { useRealtimeAlertsContext } from '@/contexts/RealtimeAlertsContext';
 import { BudgetMonitorButton } from '@/components/BudgetMonitorButton';
 import { format } from 'date-fns';
@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export default function AlertaGasto() {
-  const { alerts, isLoading, refetch } = useCampaignAlerts();
+  const { campaigns, isLoading, refetch } = useMonitoredCampaigns();
   const { clearNewAlertsCount } = useRealtimeAlertsContext();
   const [isSyncingMeta, setIsSyncingMeta] = useState(false);
   const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
@@ -121,9 +121,9 @@ export default function AlertaGasto() {
     return 'bg-green-500';
   };
 
-  const filteredAlerts = alerts.filter((alert) => {
+  const filteredCampaigns = campaigns.filter((campaign) => {
     if (statusFilter === 'all') return true;
-    return getStatusCategory(alert.percentage) === statusFilter;
+    return getStatusCategory(campaign.percentage) === statusFilter;
   });
 
   const isSyncing = isSyncingMeta || isSyncingGoogle || isMonitoring;
@@ -209,7 +209,7 @@ export default function AlertaGasto() {
             {isLoading ? (
               <Skeleton className="h-6 w-32" />
             ) : (
-              `${alerts.length} Campanha(s) com Alerta`
+              `${campaigns.length} Campanha(s) Monitorada(s)`
             )}
           </CardTitle>
           <CardDescription>
@@ -273,26 +273,23 @@ export default function AlertaGasto() {
                 </div>
               ))}
             </div>
-          ) : filteredAlerts.length > 0 ? (
+          ) : filteredCampaigns.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {filteredAlerts.map((alert) => {
-                const dailyBudget = alert.campaigns?.daily_budget || 0;
-                const monthlyBudget = dailyBudget * 30;
-                const accountName = alert.campaigns?.ad_accounts?.account_name || 'Conta não identificada';
-                const percentage = alert.percentage ?? 0;
+              {filteredCampaigns.map((campaign) => {
+                const { daily_budget, monthly_budget, current_spend, percentage, account_name, campaign_name, updated_at } = campaign;
                 
                 return (
                   <div
-                    key={alert.campaign_id}
+                    key={campaign.campaign_id}
                     className="border rounded-lg p-3 space-y-2 hover:bg-accent/50 transition-colors"
                   >
                     {/* Header with account name and badge */}
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs font-medium text-muted-foreground truncate flex-1" title={accountName}>
-                        {accountName}
+                      <p className="text-xs font-medium text-muted-foreground truncate flex-1" title={account_name}>
+                        {account_name}
                       </p>
                       <Badge 
-                        variant={percentage >= 100 ? "destructive" : "secondary"}
+                        variant={percentage >= 100 ? "destructive" : percentage >= 80 ? "default" : "secondary"}
                         className="text-[10px] px-1.5 py-0 whitespace-nowrap"
                       >
                         {percentage.toFixed(1)}%
@@ -300,24 +297,24 @@ export default function AlertaGasto() {
                     </div>
 
                     {/* Campaign name */}
-                    <h3 className="text-sm font-medium truncate" title={alert.campaigns?.name || 'Campanha'}>
-                      {alert.campaigns?.name || 'Campanha sem nome'}
+                    <h3 className="text-sm font-medium truncate" title={campaign_name}>
+                      {campaign_name || 'Campanha sem nome'}
                     </h3>
 
                     {/* Budget info */}
                     <div className="space-y-1 text-xs">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Orçamento Diário:</span>
-                        <span className="font-medium">{formatCurrency(dailyBudget)}</span>
+                        <span className="font-medium">{formatCurrency(daily_budget)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Orçamento 30 dias:</span>
-                        <span className="font-medium">{formatCurrency(monthlyBudget)}</span>
+                        <span className="font-medium">{formatCurrency(monthly_budget)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Gasto Atual:</span>
                         <span className={`font-medium ${percentage >= 100 ? 'text-destructive' : percentage >= 80 ? 'text-yellow-500' : ''}`}>
-                          {formatCurrency(alert.current_amount || 0)}
+                          {formatCurrency(current_spend)}
                         </span>
                       </div>
                     </div>
@@ -361,7 +358,7 @@ export default function AlertaGasto() {
                     {percentage >= 100 ? (
                       <div className="flex items-center gap-1 text-xs text-destructive">
                         <AlertTriangle className="h-3 w-3" />
-                        <span>Excedido: {formatCurrency((alert.current_amount || 0) - monthlyBudget)}</span>
+                        <span>Excedido: {formatCurrency(current_spend - monthly_budget)}</span>
                       </div>
                     ) : percentage >= 80 && (
                       <div className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500">
@@ -373,7 +370,7 @@ export default function AlertaGasto() {
                     {/* Updated date */}
                     <p className="text-[10px] text-muted-foreground">
                       Atualizado:{' '}
-                      {format(new Date(alert.updated_at), "dd/MM/yyyy 'às' HH:mm", {
+                      {format(new Date(updated_at), "dd/MM/yyyy 'às' HH:mm", {
                         locale: ptBR,
                       })}
                     </p>
@@ -383,7 +380,7 @@ export default function AlertaGasto() {
             </div>
           ) : (
             <p className="text-center text-muted-foreground py-8">
-              Nenhum alerta ativo no momento. 🎉
+              Nenhuma campanha monitorada no momento.
             </p>
           )}
         </CardContent>
