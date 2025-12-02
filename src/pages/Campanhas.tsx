@@ -216,66 +216,57 @@ export default function Campanhas() {
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
-          <CardDescription>Filtre as campanhas por diferentes critérios</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar campanhas..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
-              />
-            </div>
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar campanhas..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8"
+            />
+          </div>
 
+          <div className="w-[180px]">
             <AdAccountFilter
               value={accountId}
               onChange={setAccountId}
               provider={provider}
             />
-
-            <AdvancedFilters
-              filters={advancedFilters}
-              onChange={setAdvancedFilters}
-            />
-
-            <Select
-              value={provider || 'all'}
-              onValueChange={(v) => setProvider(v === 'all' ? undefined : (v as 'meta' | 'google'))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Plataforma" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover">
-                <SelectItem value="all">Todas as Plataformas</SelectItem>
-                <SelectItem value="meta">Meta Ads</SelectItem>
-                <SelectItem value="google">Google Ads</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={status || 'all'}
-              onValueChange={(v) => setStatus(v === 'all' ? undefined : v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover">
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="ACTIVE">Ativas</SelectItem>
-                <SelectItem value="PAUSED">Pausadas</SelectItem>
-                <SelectItem value="DELETED">Deletadas</SelectItem>
-                <SelectItem value="HAD_DELIVERY">Tiveram veiculação</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <Select
+            value={provider || 'all'}
+            onValueChange={(v) => setProvider(v === 'all' ? undefined : (v as 'meta' | 'google'))}
+          >
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Plataforma" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover">
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="meta">Meta Ads</SelectItem>
+              <SelectItem value="google">Google Ads</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={status || 'all'}
+            onValueChange={(v) => setStatus(v === 'all' ? undefined : v)}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover">
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="ACTIVE">Ativas</SelectItem>
+              <SelectItem value="PAUSED">Pausadas</SelectItem>
+              <SelectItem value="DELETED">Deletadas</SelectItem>
+              <SelectItem value="HAD_DELIVERY">Veiculadas</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="w-[250px]">
             <DateRangePicker
               dateRange={dateRange}
               onDateRangeChange={(range) => {
@@ -285,7 +276,15 @@ export default function Campanhas() {
               }}
               placeholder="Período principal"
             />
-            {activeTab === 'analytics' && (
+          </div>
+
+          <AdvancedFilters
+            filters={advancedFilters}
+            onChange={setAdvancedFilters}
+          />
+
+          {activeTab === 'analytics' && (
+            <div className="w-[250px]">
               <DateRangePicker
                 dateRange={compareDateRange || undefined}
                 onDateRangeChange={(range) => {
@@ -295,11 +294,11 @@ export default function Campanhas() {
                     setCompareDateRange(null);
                   }
                 }}
-                placeholder="Período de comparação (opcional)"
+                placeholder="Comparar período"
               />
-            )}
-          </div>
-        </CardContent>
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Tabs for Campaigns and Analytics */}
