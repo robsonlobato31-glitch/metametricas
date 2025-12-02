@@ -85,48 +85,65 @@ export default function AlertaGasto() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="space-y-4">
-                {[1, 2].map((i) => (
-                  <div key={i} className="border rounded-lg p-4 space-y-3">
-                    <Skeleton className="h-6 w-full" />
-                    <Skeleton className="h-4 w-24" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="border rounded-lg p-3 space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-3 w-24" />
                     <Skeleton className="h-2 w-full" />
                   </div>
                 ))}
               </div>
             ) : alerts.length > 0 ? (
-              <div className="space-y-4">
-                {alerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className="border rounded-lg p-4 space-y-3 hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{alert.campaigns.name}</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Orçamento: {formatCurrency(alert.threshold_amount)}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {alerts.map((alert) => {
+                  const dailyBudget = alert.campaigns.daily_budget || alert.threshold_amount;
+                  const monthlyBudget = dailyBudget * 30;
+                  const accountName = alert.campaigns.ad_accounts?.account_name || 'Conta não identificada';
+                  
+                  return (
+                    <div
+                      key={alert.id}
+                      className="border rounded-lg p-3 space-y-2 hover:bg-accent/50 transition-colors"
+                    >
+                      {/* Header with account name and badge */}
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-medium text-muted-foreground truncate flex-1" title={accountName}>
+                          {accountName}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Disparado em:{' '}
-                          {format(new Date(alert.triggered_at), "dd/MM/yyyy 'às' HH:mm", {
-                            locale: ptBR,
-                          })}
-                        </p>
+                        <Badge 
+                          variant="destructive" 
+                          className="text-[10px] px-1.5 py-0 whitespace-nowrap"
+                        >
+                          {alert.percentage.toFixed(1)}%
+                        </Badge>
                       </div>
-                      {getStatusBadge(alert.percentage)}
-                    </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Gasto Atual</span>
-                        <span className={`font-medium ${getStatusColor(alert.percentage)}`}>
-                          {formatCurrency(alert.current_amount)} ({alert.percentage.toFixed(1)}%)
-                        </span>
+                      {/* Campaign name */}
+                      <h3 className="text-sm font-medium truncate" title={alert.campaigns.name}>
+                        {alert.campaigns.name}
+                      </h3>
+
+                      {/* Budget info */}
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Orçamento:</span>
+                          <span className="font-medium">{formatCurrency(dailyBudget)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Orçamento 30 dias:</span>
+                          <span className="font-medium">{formatCurrency(monthlyBudget)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Gasto Atual:</span>
+                          <span className={`font-medium ${getStatusColor(alert.percentage)}`}>
+                            {formatCurrency(alert.current_amount)}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Progress Bar */}
-                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                         <div
                           className={`h-full transition-all ${
                             alert.percentage >= 100
@@ -141,20 +158,24 @@ export default function AlertaGasto() {
                         />
                       </div>
 
-                      {alert.percentage >= 100 ? (
-                        <div className="flex items-center gap-2 text-sm text-destructive">
-                          <AlertTriangle className="h-4 w-4" />
+                      {/* Status message */}
+                      {alert.percentage >= 100 && (
+                        <div className="flex items-center gap-1 text-xs text-destructive">
+                          <AlertTriangle className="h-3 w-3" />
                           <span>Orçamento excedido!</span>
                         </div>
-                      ) : alert.percentage >= 95 ? (
-                        <div className="flex items-center gap-2 text-sm text-destructive">
-                          <AlertTriangle className="h-4 w-4" />
-                          <span>Orçamento quase esgotado!</span>
-                        </div>
-                      ) : null}
+                      )}
+
+                      {/* Triggered date */}
+                      <p className="text-[10px] text-muted-foreground">
+                        Disparado em:{' '}
+                        {format(new Date(alert.triggered_at), "dd/MM/yyyy 'às' HH:mm", {
+                          locale: ptBR,
+                        })}
+                      </p>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-center text-muted-foreground py-8">
