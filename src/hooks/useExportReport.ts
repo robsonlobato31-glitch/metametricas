@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { exportCampaignReport } from '@/lib/pdfExport';
+import { exportCampaignReport, IncludeSections } from '@/lib/pdfExport';
 import { toast } from '@/hooks/use-toast';
 import { useReportTemplate } from './useReportTemplate';
 
@@ -10,7 +10,6 @@ interface ExportReportOptions {
   campaigns: Array<{
     name: string;
     provider: string;
-    status: string;
     spend: string;
     budget: string;
   }>;
@@ -18,6 +17,7 @@ interface ExportReportOptions {
     budgetChart?: string;
     trendChart?: string;
   };
+  includeSections?: IncludeSections;
 }
 
 export const useExportReport = () => {
@@ -39,7 +39,8 @@ export const useExportReport = () => {
           secondaryColor: template.secondary_color,
           headerText: template.header_text,
           footerText: template.footer_text || undefined,
-        } : undefined
+        } : undefined,
+        options.includeSections
       );
       toast({
         title: 'Relatório exportado',

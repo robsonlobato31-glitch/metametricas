@@ -3,7 +3,6 @@ import { ptBR } from 'date-fns/locale';
 import { FileText } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import {
   Table,
   TableBody,
@@ -47,6 +46,11 @@ interface MetricData {
   budget?: number | null;
   results?: number | null;
   messages?: number | null;
+  conversions?: number | null;
+  ctr?: number | null;
+  cpc?: number | null;
+  cost_per_result?: number | null;
+  cost_per_message?: number | null;
 }
 
 interface ReportPreviewProps {
@@ -54,19 +58,6 @@ interface ReportPreviewProps {
   campaigns: Campaign[];
   metricsData: MetricData[];
 }
-
-const METRIC_LABELS: Record<string, string> = {
-  impressions: 'Impressões',
-  clicks: 'Cliques',
-  ctr: 'CTR',
-  cpc: 'CPC',
-  spend: 'Gasto Total',
-  conversions: 'Conversões',
-  results: 'Resultados',
-  cost_per_result: 'Custo/Resultado',
-  messages: 'Mensagens',
-  cost_per_message: 'Custo/Mensagem',
-};
 
 export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewProps) => {
   const { template } = useReportTemplate();
@@ -84,29 +75,50 @@ export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewP
     );
   }
 
-  // Calculate metrics
+  // Calculate ALL metrics based on selection
   const calculateMetrics = () => {
     const metrics: Array<{ label: string; value: string }> = [];
     
+    const totalImpressions = metricsData?.reduce((acc, m) => acc + (m.impressions || 0), 0) || 0;
+    const totalClicks = metricsData?.reduce((acc, m) => acc + (m.clicks || 0), 0) || 0;
+    const totalSpend = metricsData?.reduce((acc, m) => acc + (m.spend || 0), 0) || 0;
+    const totalResults = metricsData?.reduce((acc, m) => acc + (m.results || 0), 0) || 0;
+    const totalMessages = metricsData?.reduce((acc, m) => acc + (m.messages || 0), 0) || 0;
+    const totalConversions = metricsData?.reduce((acc, m) => acc + (m.conversions || 0), 0) || 0;
+    
     if (config.selectedMetrics.impressions) {
-      const total = metricsData?.reduce((acc, m) => acc + (m.impressions || 0), 0) || 0;
-      metrics.push({ label: 'Impressões', value: total.toLocaleString('pt-BR') });
+      metrics.push({ label: 'Impressões', value: totalImpressions.toLocaleString('pt-BR') });
     }
     if (config.selectedMetrics.clicks) {
-      const total = metricsData?.reduce((acc, m) => acc + (m.clicks || 0), 0) || 0;
-      metrics.push({ label: 'Cliques', value: total.toLocaleString('pt-BR') });
+      metrics.push({ label: 'Cliques', value: totalClicks.toLocaleString('pt-BR') });
+    }
+    if (config.selectedMetrics.ctr) {
+      const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions * 100) : 0;
+      metrics.push({ label: 'CTR', value: `${ctr.toFixed(2)}%` });
+    }
+    if (config.selectedMetrics.cpc) {
+      const cpc = totalClicks > 0 ? (totalSpend / totalClicks) : 0;
+      metrics.push({ label: 'CPC', value: `R$ ${cpc.toFixed(2)}` });
     }
     if (config.selectedMetrics.spend) {
-      const total = metricsData?.reduce((acc, m) => acc + (m.spend || 0), 0) || 0;
-      metrics.push({ label: 'Gasto Total', value: `R$ ${total.toFixed(2)}` });
+      metrics.push({ label: 'Gasto Total', value: `R$ ${totalSpend.toFixed(2)}` });
+    }
+    if (config.selectedMetrics.conversions) {
+      metrics.push({ label: 'Conversões', value: totalConversions.toLocaleString('pt-BR') });
     }
     if (config.selectedMetrics.results) {
-      const total = metricsData?.reduce((acc, m) => acc + (m.results || 0), 0) || 0;
-      metrics.push({ label: 'Resultados', value: total.toLocaleString('pt-BR') });
+      metrics.push({ label: 'Resultados', value: totalResults.toLocaleString('pt-BR') });
+    }
+    if (config.selectedMetrics.cost_per_result) {
+      const cpr = totalResults > 0 ? (totalSpend / totalResults) : 0;
+      metrics.push({ label: 'Custo/Resultado', value: `R$ ${cpr.toFixed(2)}` });
     }
     if (config.selectedMetrics.messages) {
-      const total = metricsData?.reduce((acc, m) => acc + (m.messages || 0), 0) || 0;
-      metrics.push({ label: 'Mensagens', value: total.toLocaleString('pt-BR') });
+      metrics.push({ label: 'Mensagens', value: totalMessages.toLocaleString('pt-BR') });
+    }
+    if (config.selectedMetrics.cost_per_message) {
+      const cpm = totalMessages > 0 ? (totalSpend / totalMessages) : 0;
+      metrics.push({ label: 'Custo/Mensagem', value: `R$ ${cpm.toFixed(2)}` });
     }
     
     return metrics;
@@ -115,7 +127,7 @@ export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewP
   const metrics = calculateMetrics();
 
   // Chart data
-  const chartData = metricsData?.slice(0, 8).map((m, index) => ({
+  const chartData = metricsData?.slice(0, 8).map((m) => ({
     name: m.campaign_name.substring(0, 12) + (m.campaign_name.length > 12 ? '...' : ''),
     spend: m.spend || 0,
     budget: m.budget || 0,
@@ -213,7 +225,7 @@ export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewP
           </div>
         )}
 
-        {/* Campaigns Table */}
+        {/* Campaigns Table - REMOVED Status column */}
         {config.includeSections.campaignTable && displayCampaigns.length > 0 && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold mb-3" style={{ color: primaryColor }}>
@@ -224,7 +236,6 @@ export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewP
                 <TableRow>
                   <TableHead className="text-black">Campanha</TableHead>
                   <TableHead className="text-black">Plataforma</TableHead>
-                  <TableHead className="text-black">Status</TableHead>
                   <TableHead className="text-black text-right">Gasto</TableHead>
                   <TableHead className="text-black text-right">Orçamento</TableHead>
                 </TableRow>
@@ -236,7 +247,6 @@ export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewP
                     <TableRow key={campaign.id}>
                       <TableCell className="font-medium text-black">{campaign.name}</TableCell>
                       <TableCell className="text-black">{campaign.ad_accounts?.provider || 'N/A'}</TableCell>
-                      <TableCell className="text-black">{campaign.status}</TableCell>
                       <TableCell className="text-right text-black">
                         R$ {(campaignMetrics?.spend || 0).toFixed(2)}
                       </TableCell>
