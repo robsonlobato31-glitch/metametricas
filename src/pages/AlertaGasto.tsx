@@ -284,10 +284,15 @@ export default function AlertaGasto() {
                       </div>
 
                       {/* Status message */}
-                      {alert.percentage >= 100 && (
+                      {alert.percentage >= 100 ? (
                         <div className="flex items-center gap-1 text-xs text-destructive">
                           <AlertTriangle className="h-3 w-3" />
-                          <span>Orçamento excedido: {formatCurrency(alert.current_amount - dailyBudget)}</span>
+                          <span>Orçamento excedido: {formatCurrency(alert.current_amount - monthlyBudget)}</span>
+                        </div>
+                      ) : alert.percentage >= 80 && (
+                        <div className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500">
+                          <AlertTriangle className="h-3 w-3" />
+                          <span>Seu gasto atingiu 80% do orçamento</span>
                         </div>
                       )}
 
