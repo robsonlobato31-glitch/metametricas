@@ -78,20 +78,22 @@ export const useCampaignAlerts = () => {
       const groupedMap = new Map<string, GroupedCampaignAlert>();
 
       rawAlerts.forEach((alert) => {
+        if (!alert.campaigns || !alert.campaign_id) return;
+        
         const existing = groupedMap.get(alert.campaign_id);
         
         if (!existing) {
-          const dailyBudget = alert.campaigns.daily_budget || alert.threshold_amount;
+          const dailyBudget = alert.campaigns.daily_budget || alert.threshold_amount || 0;
           const monthlyBudget = dailyBudget * 30;
           const percentage = monthlyBudget > 0 ? (alert.current_amount / monthlyBudget) * 100 : 0;
 
           groupedMap.set(alert.campaign_id, {
             campaign_id: alert.campaign_id,
             campaigns: alert.campaigns,
-            current_amount: alert.current_amount,
+            current_amount: alert.current_amount || 0,
             updated_at: alert.triggered_at,
             triggered_thresholds: [alert.threshold_amount],
-            percentage,
+            percentage: percentage || 0,
           });
         } else {
           // Add threshold if not already present
@@ -100,10 +102,10 @@ export const useCampaignAlerts = () => {
           }
           // Update to most recent values
           if (new Date(alert.triggered_at) > new Date(existing.updated_at)) {
-            existing.current_amount = alert.current_amount;
+            existing.current_amount = alert.current_amount || 0;
             existing.updated_at = alert.triggered_at;
             // Recalculate percentage
-            const dailyBudget = alert.campaigns.daily_budget || alert.threshold_amount;
+            const dailyBudget = alert.campaigns.daily_budget || alert.threshold_amount || 0;
             const monthlyBudget = dailyBudget * 30;
             existing.percentage = monthlyBudget > 0 ? (existing.current_amount / monthlyBudget) * 100 : 0;
           }
