@@ -57,6 +57,8 @@ import { useCampaigns } from '@/hooks/useCampaigns';
 import { useSavedReportTemplates, SavedReportTemplate } from '@/hooks/useSavedReportTemplates';
 import { useExportReport } from '@/hooks/useExportReport';
 import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
+import { useMetricComparison } from '@/hooks/useMetricComparison';
+import { usePlatformBreakdown } from '@/hooks/usePlatformBreakdown';
 import { ExportCharts } from '@/components/reports/ExportCharts';
 import { ReportTemplateSettings } from '@/components/settings/ReportTemplateSettings';
 import { ReportPreview } from '@/components/reports/ReportPreview';
@@ -86,10 +88,15 @@ const DEFAULT_CONFIG: ExportConfig = {
   selectedCampaignIds: [],
   selectedObjectives: [],
   includeSections: {
+    coverPage: true,
     metrics: true,
+    metricsComparison: true,
+    platformBreakdown: true,
     budgetChart: true,
     trendChart: true,
+    platformPieChart: true,
     campaignTable: true,
+    topCampaignsTable: true,
   },
   selectedMetrics: {
     impressions: true,
@@ -121,6 +128,8 @@ const Relatorios = () => {
   const { templates, isLoading: templatesLoading, createTemplate, updateTemplate, deleteTemplate } = useSavedReportTemplates();
   const { exportReport, isExporting } = useExportReport();
   const { data: metricsData } = useCampaignMetrics();
+  const { comparisonData } = useMetricComparison(parseInt(config.period));
+  const { platformData } = usePlatformBreakdown(parseInt(config.period));
 
   // Get unique objectives from campaigns
   const availableObjectives = useMemo(() => {
@@ -237,8 +246,8 @@ const Relatorios = () => {
       );
     }
 
-    // Calculate ALL metrics based on selection
-    const metrics: Array<{ label: string; value: string }> = [];
+    // Calculate ALL metrics based on selection with variation data
+    const metrics: Array<{ label: string; value: string; variation?: number; isPositive?: boolean }> = [];
     const totalImpressions = metricsData?.reduce((acc, m) => acc + (m.impressions || 0), 0) || 0;
     const totalClicks = metricsData?.reduce((acc, m) => acc + (m.clicks || 0), 0) || 0;
     const totalSpend = metricsData?.reduce((acc, m) => acc + (m.spend || 0), 0) || 0;
@@ -247,39 +256,123 @@ const Relatorios = () => {
     const totalConversions = metricsData?.reduce((acc, m) => acc + (m.conversions || 0), 0) || 0;
 
     if (config.selectedMetrics.impressions) {
-      metrics.push({ label: 'Impressões', value: totalImpressions.toLocaleString('pt-BR') });
+      metrics.push({ 
+        label: 'Impressões', 
+        value: totalImpressions.toLocaleString('pt-BR'),
+        variation: comparisonData?.impressions?.variationPercent,
+        isPositive: comparisonData?.impressions?.isPositive,
+      });
     }
     if (config.selectedMetrics.clicks) {
-      metrics.push({ label: 'Cliques', value: totalClicks.toLocaleString('pt-BR') });
+      metrics.push({ 
+        label: 'Cliques', 
+        value: totalClicks.toLocaleString('pt-BR'),
+        variation: comparisonData?.clicks?.variationPercent,
+        isPositive: comparisonData?.clicks?.isPositive,
+      });
     }
     if (config.selectedMetrics.ctr) {
       const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions * 100) : 0;
-      metrics.push({ label: 'CTR', value: `${ctr.toFixed(2)}%` });
+      metrics.push({ 
+        label: 'CTR', 
+        value: `${ctr.toFixed(2)}%`,
+        variation: comparisonData?.ctr?.variationPercent,
+        isPositive: comparisonData?.ctr?.isPositive,
+      });
     }
     if (config.selectedMetrics.cpc) {
       const cpc = totalClicks > 0 ? (totalSpend / totalClicks) : 0;
-      metrics.push({ label: 'CPC', value: `R$ ${cpc.toFixed(2)}` });
+      metrics.push({ 
+        label: 'CPC', 
+        value: `R$ ${cpc.toFixed(2)}`,
+        variation: comparisonData?.cpc?.variationPercent,
+        isPositive: !comparisonData?.cpc?.isPositive, // Lower CPC is better
+      });
     }
     if (config.selectedMetrics.spend) {
-      metrics.push({ label: 'Gasto Total', value: `R$ ${totalSpend.toFixed(2)}` });
+      metrics.push({ 
+        label: 'Gasto Total', 
+        value: `R$ ${totalSpend.toFixed(2)}`,
+        variation: comparisonData?.spend?.variationPercent,
+        isPositive: undefined, // Spend variation is neutral
+      });
     }
     if (config.selectedMetrics.conversions) {
-      metrics.push({ label: 'Conversões', value: totalConversions.toLocaleString('pt-BR') });
+      metrics.push({ 
+        label: 'Conversões', 
+        value: totalConversions.toLocaleString('pt-BR'),
+        variation: comparisonData?.conversions?.variationPercent,
+        isPositive: comparisonData?.conversions?.isPositive,
+      });
     }
     if (config.selectedMetrics.results) {
-      metrics.push({ label: 'Resultados', value: totalResults.toLocaleString('pt-BR') });
+      metrics.push({ 
+        label: 'Resultados', 
+        value: totalResults.toLocaleString('pt-BR'),
+        variation: comparisonData?.results?.variationPercent,
+        isPositive: comparisonData?.results?.isPositive,
+      });
     }
     if (config.selectedMetrics.cost_per_result) {
       const cpr = totalResults > 0 ? (totalSpend / totalResults) : 0;
-      metrics.push({ label: 'Custo/Resultado', value: `R$ ${cpr.toFixed(2)}` });
+      metrics.push({ 
+        label: 'Custo/Resultado', 
+        value: `R$ ${cpr.toFixed(2)}`,
+        variation: comparisonData?.costPerResult?.variationPercent,
+        isPositive: !comparisonData?.costPerResult?.isPositive, // Lower cost is better
+      });
     }
     if (config.selectedMetrics.messages) {
-      metrics.push({ label: 'Mensagens', value: totalMessages.toLocaleString('pt-BR') });
+      metrics.push({ 
+        label: 'Mensagens', 
+        value: totalMessages.toLocaleString('pt-BR'),
+        variation: comparisonData?.messages?.variationPercent,
+        isPositive: comparisonData?.messages?.isPositive,
+      });
     }
     if (config.selectedMetrics.cost_per_message) {
       const cpm = totalMessages > 0 ? (totalSpend / totalMessages) : 0;
-      metrics.push({ label: 'Custo/Mensagem', value: `R$ ${cpm.toFixed(2)}` });
+      metrics.push({ 
+        label: 'Custo/Mensagem', 
+        value: `R$ ${cpm.toFixed(2)}`,
+        variation: comparisonData?.costPerMessage?.variationPercent,
+        isPositive: !comparisonData?.costPerMessage?.isPositive, // Lower cost is better
+      });
     }
+
+    // Prepare comparison data for PDF
+    const comparisonDataForPdf = comparisonData ? [
+      { label: 'Impressões', current: comparisonData.impressions.current, previous: comparisonData.impressions.previous, format: 'number' as const },
+      { label: 'Cliques', current: comparisonData.clicks.current, previous: comparisonData.clicks.previous, format: 'number' as const },
+      { label: 'Gasto', current: comparisonData.spend.current, previous: comparisonData.spend.previous, format: 'currency' as const },
+      { label: 'Resultados', current: comparisonData.results.current, previous: comparisonData.results.previous, format: 'number' as const },
+    ] : [];
+
+    // Prepare platform data for PDF
+    const platformDataForPdf = platformData?.map(p => ({
+      provider: p.provider,
+      impressions: p.impressions,
+      clicks: p.clicks,
+      spend: p.spend,
+      cpc: p.cpc,
+      results: p.results,
+      costPerResult: p.costPerResult,
+    })) || [];
+
+    // Prepare top campaigns data
+    const topCampaignsForPdf = exportCampaigns.slice(0, 10).map((c) => {
+      const campaignMetrics = metricsData?.find((m) => m.campaign_id === c.id);
+      return {
+        name: c.name,
+        provider: c.ad_accounts?.provider === 'meta' ? 'Meta Ads' : c.ad_accounts?.provider === 'google' ? 'Google Ads' : c.ad_accounts?.provider || 'N/A',
+        impressions: campaignMetrics?.impressions || 0,
+        clicks: campaignMetrics?.clicks || 0,
+        cpc: (campaignMetrics?.clicks || 0) > 0 ? (campaignMetrics?.spend || 0) / (campaignMetrics?.clicks || 1) : 0,
+        results: campaignMetrics?.results || 0,
+        costPerResult: (campaignMetrics?.results || 0) > 0 ? (campaignMetrics?.spend || 0) / (campaignMetrics?.results || 1) : 0,
+        spend: campaignMetrics?.spend || 0,
+      };
+    });
 
     await exportReport({
       title: 'Relatório de Campanhas',
@@ -287,15 +380,19 @@ const Relatorios = () => {
       metrics,
       campaigns: exportCampaigns.map((c) => ({
         name: c.name,
-        provider: c.ad_accounts?.provider || 'N/A',
+        provider: c.ad_accounts?.provider === 'meta' ? 'Meta Ads' : c.ad_accounts?.provider === 'google' ? 'Google Ads' : c.ad_accounts?.provider || 'N/A',
         spend: `R$ ${(metricsData?.find((m) => m.campaign_id === c.id)?.spend || 0).toFixed(2)}`,
         budget: c.budget ? `R$ ${c.budget.toFixed(2)}` : 'N/A',
       })),
       chartIds: {
         budgetChart: config.includeSections.budgetChart ? 'budget-chart' : undefined,
         trendChart: config.includeSections.trendChart ? 'trend-chart' : undefined,
+        platformPieChart: config.includeSections.platformPieChart ? 'platform-pie-chart' : undefined,
       },
       includeSections: config.includeSections,
+      comparisonData: comparisonDataForPdf,
+      platformData: platformDataForPdf,
+      topCampaigns: topCampaignsForPdf,
     });
 
     setShowCharts(false);
@@ -585,9 +682,14 @@ const Relatorios = () => {
                   <Label>Seções a Incluir</Label>
                   <div className="space-y-2">
                     {[
+                      { key: 'coverPage', label: 'Página de Capa' },
                       { key: 'metrics', label: 'Resumo de Métricas' },
+                      { key: 'metricsComparison', label: 'Comparativo com Período Anterior' },
+                      { key: 'platformBreakdown', label: 'Resultados por Plataforma' },
                       { key: 'budgetChart', label: 'Gráfico de Orçamento' },
                       { key: 'trendChart', label: 'Gráfico de Evolução' },
+                      { key: 'platformPieChart', label: 'Gráfico de Distribuição (Pizza)' },
+                      { key: 'topCampaignsTable', label: 'Principais Campanhas (Detalhada)' },
                       { key: 'campaignTable', label: 'Tabela de Campanhas' },
                     ].map(({ key, label }) => (
                       <div key={key} className="flex items-center space-x-2">

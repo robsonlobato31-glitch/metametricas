@@ -1,6 +1,6 @@
 import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText } from 'lucide-react';
+import { FileText, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -22,6 +22,9 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 import type { ExportConfig } from '@/components/reports/ExportReportDialog';
 import { useReportTemplate } from '@/hooks/useReportTemplate';
@@ -58,6 +61,8 @@ interface ReportPreviewProps {
   campaigns: Campaign[];
   metricsData: MetricData[];
 }
+
+const PLATFORM_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
 
 export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewProps) => {
   const { template } = useReportTemplate();
@@ -135,24 +140,58 @@ export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewP
     clicks: m.clicks || 0,
   })) || [];
 
+  // Platform pie chart data
+  const platformData = campaigns.reduce((acc, c) => {
+    const provider = c.ad_accounts?.provider || 'unknown';
+    const spend = metricsData?.find(m => m.campaign_id === c.id)?.spend || 0;
+    const existing = acc.find(p => p.name === provider);
+    if (existing) {
+      existing.value += spend;
+    } else {
+      acc.push({ name: provider === 'meta' ? 'Meta Ads' : provider === 'google' ? 'Google Ads' : provider, value: spend });
+    }
+    return acc;
+  }, [] as Array<{ name: string; value: number }>);
+
   const primaryColor = template?.primary_color || '#3B82F6';
   const secondaryColor = template?.secondary_color || '#10B981';
+
+  const hasAnySectionEnabled = config.includeSections.metrics || 
+    config.includeSections.budgetChart || 
+    config.includeSections.trendChart || 
+    config.includeSections.campaignTable ||
+    config.includeSections.coverPage ||
+    config.includeSections.metricsComparison ||
+    config.includeSections.platformBreakdown ||
+    config.includeSections.platformPieChart ||
+    config.includeSections.topCampaignsTable;
 
   return (
     <ScrollArea className="h-[600px] w-full">
       <div className="bg-white text-black p-6 min-h-full" style={{ fontFamily: 'Arial, sans-serif' }}>
+        {/* Cover Page Preview */}
+        {config.includeSections.coverPage && (
+          <div className="mb-6 p-8 border-2 rounded-lg text-center" style={{ borderColor: primaryColor, backgroundColor: '#f8fafc' }}>
+            {template?.logo_url && (
+              <img src={template.logo_url} alt="Logo" className="h-16 w-auto mx-auto mb-4 object-contain" />
+            )}
+            <h1 className="text-2xl font-bold mb-2" style={{ color: primaryColor }}>
+              {template?.header_text || 'Relatório de Campanhas'}
+            </h1>
+            <div className="inline-block px-6 py-2 rounded text-white" style={{ backgroundColor: primaryColor }}>
+              {periodText}
+            </div>
+          </div>
+        )}
+
         {/* PDF Header Simulation */}
         <div className="mb-6 pb-4 border-b-2" style={{ borderColor: primaryColor }}>
           <div className="flex items-center gap-4">
             {template?.logo_url && (
-              <img 
-                src={template.logo_url} 
-                alt="Logo" 
-                className="h-12 w-auto object-contain"
-              />
+              <img src={template.logo_url} alt="Logo" className="h-10 w-auto object-contain" />
             )}
             <div>
-              <h1 className="text-2xl font-bold" style={{ color: primaryColor }}>
+              <h1 className="text-xl font-bold" style={{ color: primaryColor }}>
                 {template?.header_text || 'Relatório de Campanhas'}
               </h1>
               <p className="text-sm text-gray-600">Período: {periodText}</p>
@@ -175,6 +214,34 @@ export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewP
                   </p>
                 </Card>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Platform Pie Chart */}
+        {config.includeSections.platformPieChart && platformData.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3" style={{ color: primaryColor }}>
+              Distribuição por Plataforma
+            </h2>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={platformData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={70}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {platformData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={PLATFORM_COLORS[index % PLATFORM_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => `R$ ${value.toFixed(2)}`} />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           </div>
         )}
@@ -225,7 +292,7 @@ export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewP
           </div>
         )}
 
-        {/* Campaigns Table - REMOVED Status column */}
+        {/* Campaigns Table */}
         {config.includeSections.campaignTable && displayCampaigns.length > 0 && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold mb-3" style={{ color: primaryColor }}>
@@ -258,11 +325,6 @@ export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewP
                 })}
               </TableBody>
             </Table>
-            {displayCampaigns.length > 10 && (
-              <p className="text-xs text-gray-500 mt-2 text-center">
-                ... e mais {displayCampaigns.length - 10} campanhas
-              </p>
-            )}
           </div>
         )}
 
@@ -274,10 +336,7 @@ export const ReportPreview = ({ config, campaigns, metricsData }: ReportPreviewP
         )}
 
         {/* Empty State */}
-        {!config.includeSections.metrics && 
-         !config.includeSections.budgetChart && 
-         !config.includeSections.trendChart && 
-         !config.includeSections.campaignTable && (
+        {!hasAnySectionEnabled && (
           <div className="flex flex-col items-center justify-center py-12">
             <FileText className="h-16 w-16 text-gray-300 mb-4" />
             <p className="text-gray-500">Selecione pelo menos uma seção para incluir no relatório.</p>
