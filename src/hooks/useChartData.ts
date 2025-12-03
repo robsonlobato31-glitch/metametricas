@@ -9,79 +9,62 @@ interface ChartDataPoint {
   value: number;
 }
 
-export const useChartData = () => {
+interface UseChartDataOptions {
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
+export const useChartData = (options?: UseChartDataOptions) => {
   const { user } = useAuth();
+  
+  // Default: últimos 7 dias
+  const today = new Date();
+  const defaultDateFrom = subDays(today, 6);
+  const dateFrom = options?.dateFrom || defaultDateFrom;
+  const dateTo = options?.dateTo || today;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['chart-data', user?.id],
+    queryKey: ['chart-data', user?.id, format(dateFrom, 'yyyy-MM-dd'), format(dateTo, 'yyyy-MM-dd')],
     queryFn: async () => {
-      // Últimos 7 dias (hoje e os 6 dias anteriores)
-      const today = new Date();
-      const sevenDaysAgo = subDays(today, 6);
-      const daysOfWeek = eachDayOfInterval({ start: sevenDaysAgo, end: today });
+      const daysInRange = eachDayOfInterval({ start: dateFrom, end: dateTo });
       
       // Estrutura padrão com 0 para cada dia
-      const emptyChart: ChartDataPoint[] = daysOfWeek.map(day => ({
-        name: format(day, 'EEE', { locale: ptBR }),
+      const emptyChart: ChartDataPoint[] = daysInRange.map(day => ({
+        name: format(day, 'dd/MM', { locale: ptBR }),
         value: 0,
       }));
 
       if (!user?.id) return emptyChart;
 
-      // Step 1: Buscar integrations do usuário
-      const { data: integrations, error: intError } = await supabase
-        .from('integrations')
-        .select('id')
-        .eq('user_id', user.id);
-
-      if (intError) throw intError;
-      if (!integrations || integrations.length === 0) return emptyChart;
-
-      const integrationIds = integrations.map(i => i.id);
-
-      // Step 2: Buscar ad_accounts dessas integrations
-      const { data: adAccounts, error: aaError } = await supabase
-        .from('ad_accounts')
-        .select('id')
-        .in('integration_id', integrationIds);
-
-      if (aaError) throw aaError;
-      if (!adAccounts || adAccounts.length === 0) return emptyChart;
-
-      const adAccountIds = adAccounts.map(aa => aa.id);
-
-      // Step 3: Buscar campaigns dessas ad_accounts
-      const { data: campaigns, error: campError } = await supabase
-        .from('campaigns')
-        .select('id')
-        .in('ad_account_id', adAccountIds);
-
-      if (campError) throw campError;
-      if (!campaigns || campaigns.length === 0) return emptyChart;
-
-      const campaignIds = campaigns.map(c => c.id);
-
-      // Step 4: Buscar métricas dos últimos 7 dias
+      // Usar a função RPC para buscar métricas agregadas
       const { data: metrics, error: metricsError } = await supabase
-        .from('metrics')
-        .select('date, spend')
-        .in('campaign_id', campaignIds)
-        .gte('date', format(sevenDaysAgo, 'yyyy-MM-dd'))
-        .lte('date', format(today, 'yyyy-MM-dd'))
-        .order('date');
+        .rpc('get_chart_metrics', {
+          p_user_id: user.id,
+          p_date_from: format(dateFrom, 'yyyy-MM-dd'),
+          p_date_to: format(dateTo, 'yyyy-MM-dd'),
+        });
 
-      if (metricsError) throw metricsError;
+      if (metricsError) {
+        console.error('Error fetching chart metrics:', metricsError);
+        throw metricsError;
+      }
 
-      // Agrupar por dia
-      const chartData: ChartDataPoint[] = daysOfWeek.map(day => {
+      // Mapear as métricas por data
+      const metricsMap = new Map<string, number>();
+      if (metrics) {
+        metrics.forEach((m: { metric_date: string; total_spend: number }) => {
+          metricsMap.set(m.metric_date, Number(m.total_spend) || 0);
+        });
+      }
+
+      // Construir os dados do gráfico com todos os dias
+      const chartData: ChartDataPoint[] = daysInRange.map(day => {
         const dayStr = format(day, 'yyyy-MM-dd');
-        const dayMetrics = metrics?.filter(m => m.date === dayStr) || [];
-        
-        const totalSpend = dayMetrics.reduce((sum, m) => sum + (Number(m.spend) || 0), 0);
+        const spend = metricsMap.get(dayStr) || 0;
         
         return {
-          name: format(day, 'EEE', { locale: ptBR }),
-          value: totalSpend,
+          name: format(day, 'dd/MM', { locale: ptBR }),
+          value: spend,
         };
       });
 

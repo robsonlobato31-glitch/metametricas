@@ -1003,6 +1003,13 @@ export type Database = {
           roles: Database["public"]["Enums"]["app_role"][]
         }[]
       }
+      get_chart_metrics: {
+        Args: { p_date_from: string; p_date_to: string; p_user_id: string }
+        Returns: {
+          metric_date: string
+          total_spend: number
+        }[]
+      }
       get_detailed_metrics: {
         Args: { p_date_from: string; p_date_to: string; p_user_id: string }
         Returns: {

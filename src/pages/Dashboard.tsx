@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Edit3, Plus, RotateCcw, Save, Settings2 } from 'lucide-react';
+import { Edit3, Plus, RotateCcw, Save, Calendar } from 'lucide-react';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { OnboardingChecklist } from '@/components/onboarding/OnboardingChecklist';
 import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
@@ -12,6 +12,8 @@ import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 import { Layout as GridLayout } from 'react-grid-layout';
 import { DashboardWidget } from '@/types/dashboard';
 import { ColumnCustomizer } from '@/components/filters/ColumnCustomizer';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { subDays } from 'date-fns';
 
 const AVAILABLE_WIDGETS = [
   { id: 'metric-spend', label: 'Gasto Total', required: false },
@@ -26,6 +28,8 @@ const AVAILABLE_WIDGETS = [
   { id: 'quick-actions', label: 'Ações Rápidas', required: false },
 ];
 
+type DateRangePreset = '7days' | '14days' | '30days';
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { isTourCompleted } = useOnboarding();
@@ -38,6 +42,24 @@ export default function Dashboard() {
   const [visibleWidgets, setVisibleWidgets] = useState<string[]>(
     layout.widgets.map((w) => w.type)
   );
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('7days');
+
+  // Calcular datas baseado no preset
+  const today = new Date();
+  const getDateRange = () => {
+    switch (dateRangePreset) {
+      case '7days':
+        return { dateFrom: subDays(today, 6), dateTo: today };
+      case '14days':
+        return { dateFrom: subDays(today, 13), dateTo: today };
+      case '30days':
+        return { dateFrom: subDays(today, 29), dateTo: today };
+      default:
+        return { dateFrom: subDays(today, 6), dateTo: today };
+    }
+  };
+
+  const { dateFrom, dateTo } = getDateRange();
 
   // Sincronizar currentLayouts quando o layout muda (ex: após remover widget)
   useEffect(() => {
@@ -105,7 +127,20 @@ export default function Dashboard() {
             </p>
           </div>
           
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
+            {/* Date Range Filter */}
+            <Select value={dateRangePreset} onValueChange={(value: DateRangePreset) => setDateRangePreset(value)}>
+              <SelectTrigger className="w-[160px]">
+                <Calendar className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7days">Últimos 7 dias</SelectItem>
+                <SelectItem value="14days">Últimos 14 dias</SelectItem>
+                <SelectItem value="30days">Últimos 30 dias</SelectItem>
+              </SelectContent>
+            </Select>
+
             {isEditMode ? (
               <>
                 <Button variant="outline" onClick={handleCancelEdit}>
@@ -164,6 +199,8 @@ export default function Dashboard() {
           isEditMode={isEditMode}
           onLayoutChange={handleLayoutChange}
           onRemoveWidget={handleRemoveWidgetFromGrid}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
         />
 
         {/* Onboarding Tour */}
