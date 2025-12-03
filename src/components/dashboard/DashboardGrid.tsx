@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Responsive, WidthProvider, Layout } from 'react-grid-layout';
 import { DashboardWidget } from '@/types/dashboard';
 import { MetricWidget } from './widgets/MetricWidget';
@@ -30,6 +29,8 @@ interface DashboardGridProps {
   isEditMode: boolean;
   onLayoutChange: (layout: Layout[], layouts: any) => void;
   onRemoveWidget: (widgetId: string) => void;
+  dateFrom?: Date;
+  dateTo?: Date;
 }
 
 export const DashboardGrid = ({
@@ -38,9 +39,11 @@ export const DashboardGrid = ({
   isEditMode,
   onLayoutChange,
   onRemoveWidget,
+  dateFrom,
+  dateTo,
 }: DashboardGridProps) => {
   const { totals, isLoading } = useMetrics();
-  const { data: chartData, isLoading: chartLoading } = useChartData();
+  const { data: chartData, isLoading: chartLoading } = useChartData({ dateFrom, dateTo });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -103,7 +106,7 @@ export const DashboardGrid = ({
         case 'metric-cost-per-result':
           return <CostPerResultWidget />;
         case 'chart-performance':
-          return <ChartWidget title="Performance Semanal" data={chartData} isLoading={chartLoading} />;
+          return <ChartWidget title="Performance" data={chartData} isLoading={chartLoading} />;
         case 'campaign-list':
           return <CampaignListWidget />;
         case 'alerts-list':
