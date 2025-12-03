@@ -13,7 +13,12 @@ import { Layout as GridLayout } from 'react-grid-layout';
 import { DashboardWidget } from '@/types/dashboard';
 import { ColumnCustomizer } from '@/components/filters/ColumnCustomizer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { subDays } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { subDays, startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { DateRange } from 'react-day-picker';
+import { cn } from '@/lib/utils';
 
 const AVAILABLE_WIDGETS = [
   { id: 'metric-spend', label: 'Gasto Total', required: false },
@@ -22,13 +27,14 @@ const AVAILABLE_WIDGETS = [
   { id: 'metric-conversions', label: 'Conversões', required: false },
   { id: 'metric-results', label: 'Resultados', required: false },
   { id: 'metric-messages', label: 'Mensagens', required: false },
+  { id: 'metric-cost-per-message', label: 'Custo/Mensagem', required: false },
   { id: 'chart-performance', label: 'Gráfico de Performance', required: false },
   { id: 'alerts', label: 'Alertas', required: false },
   { id: 'campaigns', label: 'Lista de Campanhas', required: false },
   { id: 'quick-actions', label: 'Ações Rápidas', required: false },
 ];
 
-type DateRangePreset = '7days' | '14days' | '30days';
+type DateRangePreset = '7days' | '14days' | '30days' | 'thisMonth' | 'lastMonth' | 'custom';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -43,6 +49,7 @@ export default function Dashboard() {
     layout.widgets.map((w) => w.type)
   );
   const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('7days');
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
 
   // Calcular datas baseado no preset
   const today = new Date();
@@ -54,6 +61,16 @@ export default function Dashboard() {
         return { dateFrom: subDays(today, 13), dateTo: today };
       case '30days':
         return { dateFrom: subDays(today, 29), dateTo: today };
+      case 'thisMonth':
+        return { dateFrom: startOfMonth(today), dateTo: today };
+      case 'lastMonth':
+        const lastMonth = subMonths(today, 1);
+        return { dateFrom: startOfMonth(lastMonth), dateTo: endOfMonth(lastMonth) };
+      case 'custom':
+        return { 
+          dateFrom: customDateRange?.from || subDays(today, 6), 
+          dateTo: customDateRange?.to || today 
+        };
       default:
         return { dateFrom: subDays(today, 6), dateTo: today };
     }
@@ -129,17 +146,56 @@ export default function Dashboard() {
           
           <div className="flex gap-2 flex-wrap items-center">
             {/* Date Range Filter */}
-            <Select value={dateRangePreset} onValueChange={(value: DateRangePreset) => setDateRangePreset(value)}>
-              <SelectTrigger className="w-[160px]">
-                <Calendar className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7days">Últimos 7 dias</SelectItem>
-                <SelectItem value="14days">Últimos 14 dias</SelectItem>
-                <SelectItem value="30days">Últimos 30 dias</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={dateRangePreset} onValueChange={(value: DateRangePreset) => setDateRangePreset(value)}>
+                <SelectTrigger className="w-[160px]">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7days">Últimos 7 dias</SelectItem>
+                  <SelectItem value="14days">Últimos 14 dias</SelectItem>
+                  <SelectItem value="30days">Últimos 30 dias</SelectItem>
+                  <SelectItem value="thisMonth">Este mês</SelectItem>
+                  <SelectItem value="lastMonth">Mês anterior</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {dateRangePreset === 'custom' && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal", !customDateRange && "text-muted-foreground")}>
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {customDateRange?.from ? (
+                        customDateRange.to ? (
+                          <>
+                            {format(customDateRange.from, "dd/MM/yy", { locale: ptBR })} - {format(customDateRange.to, "dd/MM/yy", { locale: ptBR })}
+                          </>
+                        ) : (
+                          format(customDateRange.from, "dd/MM/yy", { locale: ptBR })
+                        )
+                      ) : (
+                        <span>Selecionar datas</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      initialFocus
+                      mode="range"
+                      defaultMonth={customDateRange?.from}
+                      selected={customDateRange}
+                      onSelect={setCustomDateRange}
+                      numberOfMonths={2}
+                      locale={ptBR}
+                      disabled={(date) => date > new Date()}
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
 
             {isEditMode ? (
               <>
