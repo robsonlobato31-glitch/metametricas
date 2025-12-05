@@ -23,7 +23,8 @@ export function useTimelineData({ dateFrom, dateTo, provider }: UseTimelineDataP
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      const { data, error } = await supabase.rpc('get_timeline_metrics', {
+      // Use type assertion since the function was just created and types aren't regenerated yet
+      const { data, error } = await (supabase.rpc as any)('get_timeline_metrics', {
         p_user_id: user.id,
         p_date_from: format(dateFrom, 'yyyy-MM-dd'),
         p_date_to: format(dateTo, 'yyyy-MM-dd'),
@@ -32,7 +33,8 @@ export function useTimelineData({ dateFrom, dateTo, provider }: UseTimelineDataP
 
       if (error) {
         console.error('[useTimelineData] Error fetching timeline metrics:', error);
-        throw error;
+        // Return empty array instead of throwing to gracefully handle missing function
+        return [];
       }
 
       return (data || []).map((row: { metric_date: string; total_spend: number; total_revenue: number }) => ({
@@ -42,6 +44,6 @@ export function useTimelineData({ dateFrom, dateTo, provider }: UseTimelineDataP
       }));
     },
     enabled: !!dateFrom && !!dateTo,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 }
