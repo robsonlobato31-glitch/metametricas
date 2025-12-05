@@ -1094,6 +1094,34 @@ export type Database = {
           total_video_views_75: number
         }[]
       }
+      get_funnel_metrics: {
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_provider?: string
+          p_user_id: string
+        }
+        Returns: {
+          total_impressions: number
+          total_initiated_checkout: number
+          total_link_clicks: number
+          total_page_views: number
+          total_purchases: number
+        }[]
+      }
+      get_timeline_metrics: {
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_provider?: string
+          p_user_id: string
+        }
+        Returns: {
+          metric_date: string
+          total_revenue: number
+          total_spend: number
+        }[]
+      }
       get_user_plan: {
         Args: { p_user_id: string }
         Returns: {

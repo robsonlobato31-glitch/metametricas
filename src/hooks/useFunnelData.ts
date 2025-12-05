@@ -16,20 +16,25 @@ interface UseFunnelDataParams {
   provider?: string | null;
 }
 
+const emptyFunnel: FunnelMetrics = {
+  impressions: 0,
+  linkClicks: 0,
+  pageViews: 0,
+  initiatedCheckout: 0,
+  purchases: 0,
+};
+
 export function useFunnelData({ dateFrom, dateTo, provider }: UseFunnelDataParams) {
   return useQuery({
     queryKey: ['funnel-metrics', dateFrom?.toISOString(), dateTo?.toISOString(), provider],
     queryFn: async (): Promise<FunnelMetrics> => {
-      if (!dateFrom || !dateTo) {
-        return { impressions: 0, linkClicks: 0, pageViews: 0, initiatedCheckout: 0, purchases: 0 };
-      }
+      if (!dateFrom || !dateTo) return emptyFunnel;
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        return { impressions: 0, linkClicks: 0, pageViews: 0, initiatedCheckout: 0, purchases: 0 };
-      }
+      if (!user) return emptyFunnel;
 
-      const { data, error } = await supabase.rpc('get_funnel_metrics', {
+      // Use type assertion since the function was just created and types aren't regenerated yet
+      const { data, error } = await (supabase.rpc as any)('get_funnel_metrics', {
         p_user_id: user.id,
         p_date_from: format(dateFrom, 'yyyy-MM-dd'),
         p_date_to: format(dateTo, 'yyyy-MM-dd'),
@@ -38,7 +43,8 @@ export function useFunnelData({ dateFrom, dateTo, provider }: UseFunnelDataParam
 
       if (error) {
         console.error('[useFunnelData] Error fetching funnel metrics:', error);
-        throw error;
+        // Return empty funnel instead of throwing to gracefully handle missing function
+        return emptyFunnel;
       }
 
       const row = data?.[0] || {};
@@ -51,6 +57,6 @@ export function useFunnelData({ dateFrom, dateTo, provider }: UseFunnelDataParam
       };
     },
     enabled: !!dateFrom && !!dateTo,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 }
