@@ -46,7 +46,13 @@ export default function CampanhasGoogleAds() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <DateRangePicker date={dateRange} setDate={setDateRange} />
+                    <DateRangePicker 
+                        dateRange={dateRange}
+                        onDateRangeChange={(range) => setDateRange({
+                            from: range?.from || new Date(),
+                            to: range?.to || new Date()
+                        })}
+                    />
                 </div>
             </div>
 

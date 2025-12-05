@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
-import { subDays, format, eachDayOfInterval } from 'date-fns';
+import { subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { DollarSign, Target, TrendingUp, Eye, Percent, ShoppingBag } from 'lucide-react';
 
 import { useMetrics } from '@/hooks/useMetrics';
 import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
-import { useAdSetMetrics } from '@/hooks/useAdSetMetrics';
-import { useAdMetrics } from '@/hooks/useAdMetrics';
+import { useTimelineData } from '@/hooks/useTimelineData';
+import { useFunnelData } from '@/hooks/useFunnelData';
 
 import { Header } from '@/components/dashboard/Header';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
@@ -16,7 +16,6 @@ import { DemographicsChart } from '@/components/dashboard/DemographicsChart';
 import { VideoFunnel } from '@/components/dashboard/VideoFunnel';
 import { CampaignTable } from '@/components/dashboard/CampaignTable';
 import { CreativeTable } from '@/components/dashboard/CreativeTable';
-import { UTMTable } from '@/components/dashboard/UTMTable';
 
 import { KPI, FunnelStep, MetricLevel } from '@/components/dashboard/types';
 
@@ -29,7 +28,7 @@ export default function Metricas() {
   const [selectedLevel, setSelectedLevel] = useState<MetricLevel>('campaign');
   const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(undefined);
 
-  // Fetch data based on selected level and account
+  // Fetch metrics data
   const { totals: campaignTotals, isLoading: campaignLoading, error: campaignError } = useMetrics(
     dateRange?.from,
     dateRange?.to,
@@ -37,41 +36,29 @@ export default function Metricas() {
     'meta'
   );
 
-  // TODO: Re-enable when ad_sets and ads tables are created
-  // const { totals: adSetTotals, isLoading: adSetLoading, error: adSetError } = useAdSetMetrics(
-  //   dateRange?.from,
-  //   dateRange?.to,
-  //   selectedAccountId
-  // );
+  // Fetch real timeline data
+  const { data: timelineData = [], isLoading: timelineLoading } = useTimelineData({
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    provider: 'meta',
+  });
 
-  // const { totals: adTotals, isLoading: adLoading, error: adError } = useAdMetrics(
-  //   dateRange?.from,
-  //   dateRange?.to,
-  //   selectedAccountId
-  // );
+  // Fetch real funnel data
+  const { data: funnelMetrics, isLoading: funnelLoading } = useFunnelData({
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    provider: 'meta',
+  });
 
-  // Temporary fallback values
-  const adSetTotals = null;
-  const adSetLoading = false;
-  const adSetError = null;
-  const adTotals = null;
-  const adLoading = false;
-  const adError = null;
+  // Fetch campaign data for table
+  const { data: campaignsData, isLoading: campaignsLoading, error: campaignsError } = useCampaignMetrics({
+    provider: 'meta',
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    accountId: selectedAccountId,
+  });
 
-  // Select the appropriate totals based on level
-  const metricsTotals = selectedLevel === 'campaign'
-    ? campaignTotals
-    : selectedLevel === 'ad_set'
-      ? adSetTotals
-      : adTotals;
-
-  const isLoading = selectedLevel === 'campaign'
-    ? campaignLoading
-    : selectedLevel === 'ad_set'
-      ? adSetLoading
-      : adLoading;
-
-  const totals = metricsTotals || {
+  const totals = campaignTotals || {
     spend: 0,
     conversions: 0,
     impressions: 0,
@@ -92,14 +79,6 @@ export default function Metricas() {
     cost_per_message: 0,
   };
 
-  // Fetch campaign data for table
-  const { data: campaignsData, isLoading: campaignsLoading, error: campaignsError } = useCampaignMetrics({
-    provider: 'meta',
-    dateFrom: dateRange?.from,
-    dateTo: dateRange?.to,
-    accountId: selectedAccountId,
-  });
-
   // Format functions
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -112,21 +91,7 @@ export default function Metricas() {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
 
-  // Timeline Data - MUST be before any conditional returns
-  const timelineData = useMemo(() => {
-    if (!dateRange?.from || !dateRange?.to) return [];
-
-    const days = eachDayOfInterval({ start: dateRange.from, end: dateRange.to });
-    const avgSpend = totals.spend / days.length;
-
-    return days.map((day) => ({
-      date: format(day, 'dd/MM'),
-      spend: Math.round(avgSpend * (0.8 + Math.random() * 0.4)),
-      revenue: Math.round(avgSpend * 1.5 * (0.8 + Math.random() * 0.4)),
-    }));
-  }, [dateRange, totals]);
-
-  // Campaign Data for Table - MUST be before any conditional returns
+  // Campaign Data for Table
   const campaigns = useMemo(() => {
     if (!campaignsData || !Array.isArray(campaignsData) || campaignsData.length === 0) {
       return [];
@@ -143,22 +108,10 @@ export default function Metricas() {
     }));
   }, [campaignsData]);
 
-  // Debug logs
-  console.log('[Metricas] Debug State:', {
-    selectedLevel,
-    selectedAccountId,
-    isLoading: isLoading || campaignsLoading,
-    campaignError,
-    adSetError,
-    adError,
-    campaignsError,
-    hasCampaignTotals: !!campaignTotals,
-    hasAdSetTotals: !!adSetTotals,
-    hasAdTotals: !!adTotals,
-  });
+  const isLoading = campaignLoading || campaignsLoading || timelineLoading || funnelLoading;
 
   // Show loading state
-  if (isLoading || campaignsLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-dark-bg text-gray-200 flex items-center justify-center">
         <div className="text-center">
@@ -169,12 +122,9 @@ export default function Metricas() {
     );
   }
 
-  // Show error state for any hook
-  const anyError = campaignError || adSetError || adError || campaignsError;
+  // Show error state
+  const anyError = campaignError || campaignsError;
   if (anyError) {
-    console.error('[Metricas] Error detected:', anyError);
-
-    // Extract error message
     const errorMessage = anyError instanceof Error
       ? anyError.message
       : typeof anyError === 'object' && anyError !== null
@@ -205,10 +155,10 @@ export default function Metricas() {
   }
 
   // Check if we have any data at all
-  const hasAnyData = metricsTotals && (
-    metricsTotals.impressions > 0 ||
-    metricsTotals.clicks > 0 ||
-    metricsTotals.spend > 0
+  const hasAnyData = campaignTotals && (
+    campaignTotals.impressions > 0 ||
+    campaignTotals.clicks > 0 ||
+    campaignTotals.spend > 0
   );
 
   // Show empty state if no data
@@ -255,40 +205,42 @@ export default function Metricas() {
     { label: 'CTR', value: `${(totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0).toFixed(2)}%`, icon: Percent },
   ];
 
-  // Funnel Data
+  // Funnel Data with real values
+  const funnel = funnelMetrics || { impressions: 0, linkClicks: 0, pageViews: 0, initiatedCheckout: 0, purchases: 0 };
+  
   const funnelData: FunnelStep[] = [
     {
       label: 'Alcance',
-      value: formatNumber(totals.impressions),
+      value: formatNumber(funnel.impressions),
       subLabel: 'Pessoas alcançadas'
     },
     {
       label: 'Visualizações',
-      value: formatNumber(Math.round(totals.impressions * 0.3)),
+      value: formatNumber(funnel.pageViews),
       subLabel: 'Visualizações de página',
-      percent: '30%'
+      percent: funnel.impressions > 0 ? `${((funnel.pageViews / funnel.impressions) * 100).toFixed(1)}%` : '0%'
     },
     {
       label: 'Cliques',
-      value: formatNumber(totals.clicks),
+      value: formatNumber(funnel.linkClicks),
       subLabel: 'Cliques no link',
-      percent: `${(totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0).toFixed(2)}%`
+      percent: funnel.impressions > 0 ? `${((funnel.linkClicks / funnel.impressions) * 100).toFixed(2)}%` : '0%'
     },
     {
-      label: 'Add Carrinho',
-      value: formatNumber(Math.round(totals.clicks * 0.1)),
-      subLabel: 'Adições ao carrinho',
-      percent: '10%'
+      label: 'Carrinho',
+      value: formatNumber(funnel.initiatedCheckout),
+      subLabel: 'Iniciaram checkout',
+      percent: funnel.linkClicks > 0 ? `${((funnel.initiatedCheckout / funnel.linkClicks) * 100).toFixed(1)}%` : '0%'
     },
     {
       label: 'Compras',
-      value: formatNumber(totals.conversions),
+      value: formatNumber(funnel.purchases),
       subLabel: 'Compras realizadas',
-      percent: `${(totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0).toFixed(2)}%`
+      percent: funnel.initiatedCheckout > 0 ? `${((funnel.purchases / funnel.initiatedCheckout) * 100).toFixed(1)}%` : '0%'
     },
   ];
 
-  // Demographics Data
+  // Demographics Data (will be replaced with real data in future)
   const demographicsData = [
     { name: '18-24', value: 25, color: '#3b82f6' },
     { name: '25-34', value: 35, color: '#60a5fa' },
@@ -329,10 +281,6 @@ export default function Metricas() {
               <VideoFunnel />
               <CreativeTable creatives={[]} />
             </div>
-          </div>
-
-          <div className="mt-6">
-            <UTMTable utm={[]} />
           </div>
 
           <div className="text-center text-[10px] text-gray-700 py-8 flex items-center justify-center gap-2">

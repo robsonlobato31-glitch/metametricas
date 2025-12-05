@@ -61,6 +61,50 @@ export type Database = {
           },
         ]
       }
+      ad_groups: {
+        Row: {
+          ad_group_id: string
+          campaign_id: string
+          cpc_bid_micros: number | null
+          created_at: string
+          id: string
+          name: string
+          status: string
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          ad_group_id: string
+          campaign_id: string
+          cpc_bid_micros?: number | null
+          created_at?: string
+          id?: string
+          name: string
+          status: string
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ad_group_id?: string
+          campaign_id?: string
+          cpc_bid_micros?: number | null
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_groups_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_alerts: {
         Row: {
           alert_type: string
@@ -300,8 +344,10 @@ export type Database = {
       }
       metrics: {
         Row: {
+          average_position: number | null
           campaign_id: string
           clicks: number | null
+          conversion_value: number | null
           conversions: number | null
           cost_per_message: number | null
           cost_per_result: number | null
@@ -317,16 +363,21 @@ export type Database = {
           page_views: number | null
           purchases: number | null
           results: number | null
+          search_impression_share: number | null
           spend: number | null
           updated_at: string
+          video_view_rate: number | null
+          video_views: number | null
           video_views_100: number | null
           video_views_25: number | null
           video_views_50: number | null
           video_views_75: number | null
         }
         Insert: {
+          average_position?: number | null
           campaign_id: string
           clicks?: number | null
+          conversion_value?: number | null
           conversions?: number | null
           cost_per_message?: number | null
           cost_per_result?: number | null
@@ -342,16 +393,21 @@ export type Database = {
           page_views?: number | null
           purchases?: number | null
           results?: number | null
+          search_impression_share?: number | null
           spend?: number | null
           updated_at?: string
+          video_view_rate?: number | null
+          video_views?: number | null
           video_views_100?: number | null
           video_views_25?: number | null
           video_views_50?: number | null
           video_views_75?: number | null
         }
         Update: {
+          average_position?: number | null
           campaign_id?: string
           clicks?: number | null
+          conversion_value?: number | null
           conversions?: number | null
           cost_per_message?: number | null
           cost_per_result?: number | null
@@ -367,8 +423,11 @@ export type Database = {
           page_views?: number | null
           purchases?: number | null
           results?: number | null
+          search_impression_share?: number | null
           spend?: number | null
           updated_at?: string
+          video_view_rate?: number | null
+          video_views?: number | null
           video_views_100?: number | null
           video_views_25?: number | null
           video_views_50?: number | null
@@ -1013,6 +1072,7 @@ export type Database = {
       get_detailed_metrics: {
         Args: { p_date_from: string; p_date_to: string; p_user_id: string }
         Returns: {
+          ad_account_id: string
           avg_cost_per_message: number
           avg_cost_per_result: number
           avg_cpc: number
