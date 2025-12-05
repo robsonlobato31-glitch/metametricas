@@ -85,11 +85,12 @@ serve(async (req) => {
                     metrics_status: syncMetrics.status,
                 });
 
-            } catch (err) {
-                console.error(`[${logId}] Erro ao processar integração ${integration.id}:`, err);
+            } catch (err: unknown) {
+                const errorMessage = err instanceof Error ? err.message : String(err);
+                console.error(`[${logId}] Erro ao processar integração ${integration.id}:`, errorMessage);
                 results.push({
                     integration_id: integration.id,
-                    error: err.message,
+                    error: errorMessage,
                 });
             }
         }
