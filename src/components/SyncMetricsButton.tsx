@@ -9,7 +9,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-export const SyncMetricsButton = () => {
+interface SyncMetricsButtonProps {
+  provider?: 'meta' | 'google' | 'all';
+}
+
+export const SyncMetricsButton = ({ provider = 'all' }: SyncMetricsButtonProps) => {
   const { syncMeta, syncGoogle, isLoading } = useSyncMetrics();
   const { data: integrations } = useIntegrations();
 
@@ -17,10 +21,10 @@ export const SyncMetricsButton = () => {
   const hasGoogle = integrations?.some(i => i.provider === 'google' && i.status === 'active');
 
   const handleSync = async () => {
-    if (hasMeta) {
+    if ((provider === 'all' || provider === 'meta') && hasMeta) {
       syncMeta();
     }
-    if (hasGoogle) {
+    if ((provider === 'all' || provider === 'google') && hasGoogle) {
       syncGoogle();
     }
   };

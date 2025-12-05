@@ -1,16 +1,17 @@
-import { 
-  LayoutDashboard, 
-  Target, 
-  BarChart3, 
-  Facebook, 
-  Chrome, 
-  Bell, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Target,
+  BarChart3,
+  Facebook,
+  Chrome,
+  Bell,
+  Settings,
   Users,
   LogOut,
   Building2,
   CreditCard,
-  FileText
+  FileText,
+  Megaphone
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -36,16 +37,19 @@ import { cn } from '@/lib/utils';
 
 const mainItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-  { title: 'Campanhas', url: '/campanhas', icon: Target },
   { title: 'Métricas', url: '/metricas', icon: BarChart3 },
   { title: 'Relatórios', url: '/relatorios', icon: FileText },
 ];
 
 const integrationItems = [
   { title: 'Meta Ads', url: '/meta-ads', icon: Facebook },
+  { title: 'Campanhas Meta Ads', url: '/campanhas', icon: Target },
   { title: 'Google Ads', url: '/google-ads', icon: Chrome },
+  { title: 'Campanhas Google Ads', url: '/google-ads/campanhas', icon: Megaphone },
 ];
 
+
+// Menu items configuration
 const settingsItems = [
   { title: 'Alertas', url: '/alerta-gasto', icon: Bell },
   { title: 'Dashboard Orçamento', url: '/budget-dashboard', icon: BarChart3 },
@@ -153,8 +157,8 @@ export function AppSidebar() {
                       activeClassName="bg-muted text-primary font-medium"
                       data-tour={
                         item.title === 'Alertas' ? 'alerts' :
-                        item.title === 'Configurações' ? 'settings' :
-                        undefined
+                          item.title === 'Configurações' ? 'settings' :
+                            undefined
                       }
                     >
                       <div className="flex items-center gap-2 flex-1">

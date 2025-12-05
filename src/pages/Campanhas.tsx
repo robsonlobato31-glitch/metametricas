@@ -253,7 +253,7 @@ export default function Campanhas() {
 
     // Calculate metrics based on selected metrics
     const metrics: Array<{ label: string; value: string }> = [];
-    
+
     if (config.selectedMetrics.impressions) {
       const total = filteredCampaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
       metrics.push({ label: 'Impressões', value: formatNumber(total) });
@@ -402,7 +402,6 @@ export default function Campanhas() {
               <SelectContent className="bg-popover">
                 <SelectItem value="all">Todas</SelectItem>
                 <SelectItem value="meta">Meta Ads</SelectItem>
-                <SelectItem value="google">Google Ads</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -479,140 +478,140 @@ export default function Campanhas() {
         <TabsContent value="campaigns" className="mt-6">
           {/* Campaigns Table */}
           <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>
-              {campaigns?.length || 0} campanha(s) encontrada(s)
-            </CardTitle>
-            <ColumnCustomizer
-              pageName="campaigns"
-              availableColumns={AVAILABLE_COLUMNS}
-              onColumnsChange={setVisibleColumns}
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Carregando campanhas...
-            </div>
-          ) : campaigns && campaigns.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {visibleColumns.includes('name') && <TableHead>Campanha</TableHead>}
-                    {visibleColumns.includes('platform') && <TableHead>Plataforma</TableHead>}
-                    {visibleColumns.includes('account') && <TableHead>Conta</TableHead>}
-                    {visibleColumns.includes('status') && <TableHead>Status</TableHead>}
-                    {visibleColumns.includes('objective') && <TableHead>Objetivo</TableHead>}
-                    {visibleColumns.includes('budget') && <TableHead className="text-right">Orçamento</TableHead>}
-                    {visibleColumns.includes('impressions') && <TableHead className="text-right">Impressões</TableHead>}
-                    {visibleColumns.includes('clicks') && <TableHead className="text-right">Cliques</TableHead>}
-                    {visibleColumns.includes('ctr') && <TableHead className="text-right">CTR</TableHead>}
-                    {visibleColumns.includes('cpc') && <TableHead className="text-right">CPC</TableHead>}
-                    {visibleColumns.includes('spend') && <TableHead className="text-right">Gasto</TableHead>}
-                    {visibleColumns.includes('conversions') && <TableHead className="text-right">Conversões</TableHead>}
-                    {visibleColumns.includes('results') && <TableHead className="text-right">Resultados</TableHead>}
-                    {visibleColumns.includes('cost_per_result') && <TableHead className="text-right">Custo/Resultado</TableHead>}
-                    {visibleColumns.includes('messages') && <TableHead className="text-right">Mensagens</TableHead>}
-                    {visibleColumns.includes('cost_per_message') && <TableHead className="text-right">Custo/Mensagem</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {campaigns.map((campaign) => (
-                    <TableRow key={campaign.campaign_id}>
-                      {visibleColumns.includes('name') && (
-                        <TableCell className="font-medium max-w-xs truncate">
-                          {campaign.campaign_name}
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('platform') && (
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            {campaign.provider === 'meta' ? (
-                              <Facebook className="h-4 w-4 text-blue-500" />
-                            ) : (
-                              <Chrome className="h-4 w-4 text-red-500" />
-                            )}
-                            <span className="text-sm">
-                              {campaign.provider === 'meta' ? 'Meta' : 'Google'}
-                            </span>
-                          </div>
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('account') && (
-                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                          {campaign.account_name}
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('status') && (
-                        <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-                      )}
-                      {visibleColumns.includes('objective') && (
-                        <TableCell className="text-sm text-muted-foreground">
-                          {campaign.objective || '-'}
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('budget') && (
-                        <TableCell className="text-right">{formatCurrency(campaign.budget)}</TableCell>
-                      )}
-                      {visibleColumns.includes('impressions') && (
-                        <TableCell className="text-right">{formatNumber(campaign.impressions)}</TableCell>
-                      )}
-                      {visibleColumns.includes('clicks') && (
-                        <TableCell className="text-right">{formatNumber(campaign.clicks)}</TableCell>
-                      )}
-                      {visibleColumns.includes('ctr') && (
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {formatPercentage(campaign.ctr)}
-                            {campaign.ctr !== null && campaign.ctr !== undefined && previousCtrMap[campaign.campaign_id] !== undefined && (
-                              <TrendIndicator 
-                                currentValue={campaign.ctr || 0}
-                                previousValue={previousCtrMap[campaign.campaign_id] ?? campaign.ctr}
-                                showPercentage={false}
-                              />
-                            )}
-                          </div>
-                        </TableCell>
-                      )}
-                      {visibleColumns.includes('cpc') && (
-                        <TableCell className="text-right">{formatCurrency(campaign.cpc)}</TableCell>
-                      )}
-                      {visibleColumns.includes('spend') && (
-                        <TableCell className="text-right font-medium">{formatCurrency(campaign.spend)}</TableCell>
-                      )}
-                      {visibleColumns.includes('conversions') && (
-                        <TableCell className="text-right">{formatNumber(campaign.conversions)}</TableCell>
-                      )}
-                      {visibleColumns.includes('results') && (
-                        <TableCell className="text-right">{formatNumber(campaign.results)}</TableCell>
-                      )}
-                      {visibleColumns.includes('cost_per_result') && (
-                        <TableCell className="text-right">{formatCurrency(campaign.cost_per_result)}</TableCell>
-                      )}
-                      {visibleColumns.includes('messages') && (
-                        <TableCell className="text-right">{formatNumber(campaign.messages)}</TableCell>
-                      )}
-                      {visibleColumns.includes('cost_per_message') && (
-                        <TableCell className="text-right">{formatCurrency(campaign.cost_per_message)}</TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>Nenhuma campanha encontrada.</p>
-              <p className="text-sm mt-2">
-                Conecte suas contas e sincronize para ver suas campanhas aqui.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>
+                  {campaigns?.length || 0} campanha(s) encontrada(s)
+                </CardTitle>
+                <ColumnCustomizer
+                  pageName="campaigns"
+                  availableColumns={AVAILABLE_COLUMNS}
+                  onColumnsChange={setVisibleColumns}
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Carregando campanhas...
+                </div>
+              ) : campaigns && campaigns.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {visibleColumns.includes('name') && <TableHead>Campanha</TableHead>}
+                        {visibleColumns.includes('platform') && <TableHead>Plataforma</TableHead>}
+                        {visibleColumns.includes('account') && <TableHead>Conta</TableHead>}
+                        {visibleColumns.includes('status') && <TableHead>Status</TableHead>}
+                        {visibleColumns.includes('objective') && <TableHead>Objetivo</TableHead>}
+                        {visibleColumns.includes('budget') && <TableHead className="text-right">Orçamento</TableHead>}
+                        {visibleColumns.includes('impressions') && <TableHead className="text-right">Impressões</TableHead>}
+                        {visibleColumns.includes('clicks') && <TableHead className="text-right">Cliques</TableHead>}
+                        {visibleColumns.includes('ctr') && <TableHead className="text-right">CTR</TableHead>}
+                        {visibleColumns.includes('cpc') && <TableHead className="text-right">CPC</TableHead>}
+                        {visibleColumns.includes('spend') && <TableHead className="text-right">Gasto</TableHead>}
+                        {visibleColumns.includes('conversions') && <TableHead className="text-right">Conversões</TableHead>}
+                        {visibleColumns.includes('results') && <TableHead className="text-right">Resultados</TableHead>}
+                        {visibleColumns.includes('cost_per_result') && <TableHead className="text-right">Custo/Resultado</TableHead>}
+                        {visibleColumns.includes('messages') && <TableHead className="text-right">Mensagens</TableHead>}
+                        {visibleColumns.includes('cost_per_message') && <TableHead className="text-right">Custo/Mensagem</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {campaigns.map((campaign) => (
+                        <TableRow key={campaign.campaign_id}>
+                          {visibleColumns.includes('name') && (
+                            <TableCell className="font-medium max-w-xs truncate">
+                              {campaign.campaign_name}
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('platform') && (
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                {campaign.provider === 'meta' ? (
+                                  <Facebook className="h-4 w-4 text-blue-500" />
+                                ) : (
+                                  <Chrome className="h-4 w-4 text-red-500" />
+                                )}
+                                <span className="text-sm">
+                                  {campaign.provider === 'meta' ? 'Meta' : 'Google'}
+                                </span>
+                              </div>
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('account') && (
+                            <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                              {campaign.account_name}
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('status') && (
+                            <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                          )}
+                          {visibleColumns.includes('objective') && (
+                            <TableCell className="text-sm text-muted-foreground">
+                              {campaign.objective || '-'}
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('budget') && (
+                            <TableCell className="text-right">{formatCurrency(campaign.budget)}</TableCell>
+                          )}
+                          {visibleColumns.includes('impressions') && (
+                            <TableCell className="text-right">{formatNumber(campaign.impressions)}</TableCell>
+                          )}
+                          {visibleColumns.includes('clicks') && (
+                            <TableCell className="text-right">{formatNumber(campaign.clicks)}</TableCell>
+                          )}
+                          {visibleColumns.includes('ctr') && (
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {formatPercentage(campaign.ctr)}
+                                {campaign.ctr !== null && campaign.ctr !== undefined && previousCtrMap[campaign.campaign_id] !== undefined && (
+                                  <TrendIndicator
+                                    currentValue={campaign.ctr || 0}
+                                    previousValue={previousCtrMap[campaign.campaign_id] ?? campaign.ctr}
+                                    showPercentage={false}
+                                  />
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('cpc') && (
+                            <TableCell className="text-right">{formatCurrency(campaign.cpc)}</TableCell>
+                          )}
+                          {visibleColumns.includes('spend') && (
+                            <TableCell className="text-right font-medium">{formatCurrency(campaign.spend)}</TableCell>
+                          )}
+                          {visibleColumns.includes('conversions') && (
+                            <TableCell className="text-right">{formatNumber(campaign.conversions)}</TableCell>
+                          )}
+                          {visibleColumns.includes('results') && (
+                            <TableCell className="text-right">{formatNumber(campaign.results)}</TableCell>
+                          )}
+                          {visibleColumns.includes('cost_per_result') && (
+                            <TableCell className="text-right">{formatCurrency(campaign.cost_per_result)}</TableCell>
+                          )}
+                          {visibleColumns.includes('messages') && (
+                            <TableCell className="text-right">{formatNumber(campaign.messages)}</TableCell>
+                          )}
+                          {visibleColumns.includes('cost_per_message') && (
+                            <TableCell className="text-right">{formatCurrency(campaign.cost_per_message)}</TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Nenhuma campanha encontrada.</p>
+                  <p className="text-sm mt-2">
+                    Conecte suas contas e sincronize para ver suas campanhas aqui.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-6">

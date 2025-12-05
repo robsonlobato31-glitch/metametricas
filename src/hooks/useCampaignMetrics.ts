@@ -50,9 +50,9 @@ export const useCampaignMetrics = (filters?: CampaignMetricsFilters) => {
       if (!user?.id) return [];
 
       // Fetch campaigns and metrics separately
-        let campaignQuery = supabase
-          .from('campaigns')
-          .select(`
+      let campaignQuery = supabase
+        .from('campaigns')
+        .select(`
             *,
             ad_accounts!inner(
               id,
@@ -61,81 +61,112 @@ export const useCampaignMetrics = (filters?: CampaignMetricsFilters) => {
               integrations!inner(user_id)
             )
           `)
-          .eq('ad_accounts.integrations.user_id', user.id);
+        .eq('ad_accounts.integrations.user_id', user.id);
 
-        if (filters?.provider) {
-          campaignQuery = campaignQuery.eq('ad_accounts.provider', filters.provider);
-        }
+      if (filters?.provider) {
+        campaignQuery = campaignQuery.eq('ad_accounts.provider', filters.provider);
+      }
 
-        if (filters?.status && filters.status !== 'HAD_DELIVERY') {
-          campaignQuery = campaignQuery.eq('status', filters.status);
-        }
+      if (filters?.status && filters.status !== 'HAD_DELIVERY') {
+        campaignQuery = campaignQuery.eq('status', filters.status);
+      }
 
-        if (filters?.search) {
-          campaignQuery = campaignQuery.ilike('name', `%${filters.search}%`);
-        }
+      if (filters?.search) {
+        campaignQuery = campaignQuery.ilike('name', `%${filters.search}%`);
+      }
 
-        if (filters?.accountId) {
-          campaignQuery = campaignQuery.eq('ad_account_id', filters.accountId);
-        }
+      if (filters?.accountId) {
+        campaignQuery = campaignQuery.eq('ad_account_id', filters.accountId);
+      }
 
       const { data: campaigns, error: campError } = await campaignQuery;
 
       if (campError) throw campError;
 
+      // Validate campaigns array exists
+      if (!campaigns || !Array.isArray(campaigns) || campaigns.length === 0) {
+        console.log('[useCampaignMetrics] No campaigns found for filters:', filters);
+        return [];
+      }
+
       // For each campaign, get aggregated metrics
       const metricsPromises = campaigns.map(async (campaign) => {
-        let metricsQuery = supabase
-          .from('metrics')
-          .select('*')
-          .eq('campaign_id', campaign.id);
+        try {
+          let metricsQuery = supabase
+            .from('metrics')
+            .select('*')
+            .eq('campaign_id', campaign.id);
 
-        if (filters?.dateFrom) {
-          metricsQuery = metricsQuery.gte('date', filters.dateFrom.toISOString().split('T')[0]);
+          if (filters?.dateFrom) {
+            metricsQuery = metricsQuery.gte('date', filters.dateFrom.toISOString().split('T')[0]);
+          }
+
+          if (filters?.dateTo) {
+            metricsQuery = metricsQuery.lte('date', filters.dateTo.toISOString().split('T')[0]);
+          }
+
+          const { data: metrics } = await metricsQuery;
+
+          const totals = metrics?.reduce(
+            (acc, m) => ({
+              impressions: acc.impressions + (m.impressions || 0),
+              clicks: acc.clicks + (m.clicks || 0),
+              spend: acc.spend + (m.spend || 0),
+              conversions: acc.conversions + (m.conversions || 0),
+              results: acc.results + (m.results || 0),
+              messages: acc.messages + (m.messages || 0),
+            }),
+            { impressions: 0, clicks: 0, spend: 0, conversions: 0, results: 0, messages: 0 }
+          ) || { impressions: 0, clicks: 0, spend: 0, conversions: 0, results: 0, messages: 0 };
+
+          return {
+            campaign_id: campaign.id,
+            campaign_name: campaign.name,
+            account_name: campaign.ad_accounts?.account_name || 'Unknown',
+            ad_account_id: campaign.ad_accounts?.id || '',
+            provider: campaign.ad_accounts?.provider || 'meta',
+            status: campaign.status || 'UNKNOWN',
+            objective: campaign.objective,
+            budget: campaign.budget || campaign.daily_budget,
+            impressions: totals.impressions,
+            clicks: totals.clicks,
+            spend: totals.spend,
+            conversions: totals.conversions,
+            results: totals.results,
+            messages: totals.messages,
+            ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
+            cpc: totals.clicks > 0 ? totals.spend / totals.clicks : 0,
+            cost_per_result: totals.results > 0 ? totals.spend / totals.results : 0,
+            cost_per_message: totals.messages > 0 ? totals.spend / totals.messages : 0,
+          };
+        } catch (error) {
+          console.error('[useCampaignMetrics] Error processing campaign:', campaign.id, error);
+          // Return default values for failed campaign
+          return {
+            campaign_id: campaign.id,
+            campaign_name: campaign.name || 'Unknown',
+            account_name: campaign.ad_accounts?.account_name || 'Unknown',
+            ad_account_id: campaign.ad_accounts?.id || '',
+            provider: campaign.ad_accounts?.provider || 'meta',
+            status: campaign.status || 'UNKNOWN',
+            objective: campaign.objective,
+            budget: campaign.budget || campaign.daily_budget,
+            impressions: 0,
+            clicks: 0,
+            spend: 0,
+            conversions: 0,
+            results: 0,
+            messages: 0,
+            ctr: 0,
+            cpc: 0,
+            cost_per_result: 0,
+            cost_per_message: 0,
+          };
         }
-
-        if (filters?.dateTo) {
-          metricsQuery = metricsQuery.lte('date', filters.dateTo.toISOString().split('T')[0]);
-        }
-
-        const { data: metrics } = await metricsQuery;
-
-        const totals = metrics?.reduce(
-          (acc, m) => ({
-            impressions: acc.impressions + (m.impressions || 0),
-            clicks: acc.clicks + (m.clicks || 0),
-            spend: acc.spend + (m.spend || 0),
-            conversions: acc.conversions + (m.conversions || 0),
-            results: acc.results + (m.results || 0),
-            messages: acc.messages + (m.messages || 0),
-          }),
-          { impressions: 0, clicks: 0, spend: 0, conversions: 0, results: 0, messages: 0 }
-        ) || { impressions: 0, clicks: 0, spend: 0, conversions: 0, results: 0, messages: 0 };
-
-        return {
-          campaign_id: campaign.id,
-          campaign_name: campaign.name,
-          account_name: campaign.ad_accounts.account_name,
-          ad_account_id: campaign.ad_accounts.id,
-          provider: campaign.ad_accounts.provider,
-          status: campaign.status,
-          objective: campaign.objective,
-          budget: campaign.budget || campaign.daily_budget,
-          impressions: totals.impressions,
-          clicks: totals.clicks,
-          spend: totals.spend,
-          conversions: totals.conversions,
-          results: totals.results,
-          messages: totals.messages,
-          ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
-          cpc: totals.clicks > 0 ? totals.spend / totals.clicks : 0,
-          cost_per_result: totals.results > 0 ? totals.spend / totals.results : 0,
-          cost_per_message: totals.messages > 0 ? totals.spend / totals.messages : 0,
-        };
       });
 
       let results = await Promise.all(metricsPromises);
-      
+
       // Filtrar por "tiveram veiculação" se necessário
       if (filters?.status === 'HAD_DELIVERY') {
         results = results.filter(c => c.impressions > 0 || c.spend > 0);
@@ -177,7 +208,7 @@ export const useCampaignMetrics = (filters?: CampaignMetricsFilters) => {
       if (filters?.costPerResultMax !== undefined) {
         results = results.filter(c => c.cost_per_result <= filters.costPerResultMax!);
       }
-      
+
       return results;
     },
     enabled: !!user?.id,
