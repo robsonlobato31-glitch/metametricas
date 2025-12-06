@@ -25,44 +25,53 @@ export const DemographicsChart: React.FC<DemographicsChartProps> = ({ data }) =>
             </div>
 
             <div className="h-[200px] relative">
-                <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <Pie
-                            data={data}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
-                            stroke="none"
-                        >
-                            {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                        </Pie>
-                        <Tooltip
-                            contentStyle={{
-                                backgroundColor: '#161920',
-                                borderColor: '#2A2E37',
-                                borderRadius: '8px',
-                                color: '#e5e7eb'
-                            }}
-                            itemStyle={{ fontSize: '12px' }}
-                        />
-                        <Legend
-                            verticalAlign="bottom"
-                            height={36}
-                            iconType="circle"
-                            formatter={(value) => <span className="text-xs text-gray-400 ml-1">{value}</span>}
-                        />
-                    </PieChart>
-                </ResponsiveContainer>
+                {data.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={data}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={60}
+                                outerRadius={80}
+                                paddingAngle={5}
+                                dataKey="value"
+                                stroke="none"
+                            >
+                                {data.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                contentStyle={{
+                                    backgroundColor: '#161920',
+                                    borderColor: '#2A2E37',
+                                    borderRadius: '8px',
+                                    color: '#e5e7eb'
+                                }}
+                                itemStyle={{ fontSize: '12px' }}
+                            />
+                            <Legend
+                                verticalAlign="bottom"
+                                height={36}
+                                iconType="circle"
+                                formatter={(value) => <span className="text-xs text-gray-400 ml-1">{value}</span>}
+                            />
+                        </PieChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                        <Users className="w-8 h-8 mb-2 opacity-20" />
+                        <span className="text-xs">Nenhum dado disponível</span>
+                    </div>
+                )}
 
-                {/* Center Icon */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -mt-4">
-                    <Users className="text-gray-600 w-6 h-6" />
-                </div>
+                {/* Center Icon - Only show if there is data */}
+                {data.length > 0 && (
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -mt-4">
+                        <Users className="text-gray-600 w-6 h-6" />
+                    </div>
+                )}
             </div>
         </div>
     );

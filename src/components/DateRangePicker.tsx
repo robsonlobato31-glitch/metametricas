@@ -26,12 +26,39 @@ export function DateRangePicker({
   placeholder = 'Selecione o período',
   className,
 }: DateRangePickerProps) {
+  const [open, setOpen] = React.useState(false);
+  const [tempDateRange, setTempDateRange] = React.useState<DateRange | undefined>(dateRange);
+
+  // Sync temp range with prop only when opening
+  React.useEffect(() => {
+    if (open) {
+      setTempDateRange(dateRange);
+    }
+  }, [open]); // Removed dateRange dependency to avoid overwriting user selection if parent updates
+
+  const handleApply = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDateRangeChange(tempDateRange);
+    setOpen(false);
+  };
+
+  const handleCancel = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen(false);
+  };
+
+  const handleSelect = (range: DateRange | undefined) => {
+    setTempDateRange(range);
+  };
+
   return (
     <div className={cn('grid gap-2', className)}>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
-            id="date"
+            id="date-trigger"
             variant={'outline'}
             className={cn(
               'w-full justify-start text-left font-normal',
@@ -54,18 +81,38 @@ export function DateRangePicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={dateRange?.from}
-            selected={dateRange}
-            onSelect={onDateRangeChange}
-            numberOfMonths={2}
-            locale={ptBR}
-            disabled={(date) =>
-              date > new Date() || date < new Date('2020-01-01')
-            }
-          />
+          <div className="flex flex-col">
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={tempDateRange?.from}
+              selected={tempDateRange}
+              onSelect={handleSelect}
+              numberOfMonths={2}
+              locale={ptBR}
+              disabled={(date) =>
+                date > new Date() || date < new Date('2020-01-01')
+              }
+            />
+            <div className="flex justify-end gap-2 p-3 border-t border-border bg-popover">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancel}
+                type="button"
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleApply}
+                className="bg-brand-500 hover:bg-brand-600"
+                type="button"
+              >
+                Aplicar
+              </Button>
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
     </div>

@@ -7,6 +7,8 @@ import { OnboardingChecklist } from '@/components/onboarding/OnboardingChecklist
 import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
 import { WidgetSelector } from '@/components/dashboard/WidgetSelector';
 import { SyncMetricsButton } from '@/components/SyncMetricsButton';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorState } from '@/components/ErrorState';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 import { Layout as GridLayout } from 'react-grid-layout';
@@ -40,7 +42,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { isTourCompleted } = useOnboarding();
   const { layout, saveLayout, resetLayout, addWidget, removeWidget, isSaving } = useDashboardLayout();
-  
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [runTour, setRunTour] = useState(false);
   const [showWidgetSelector, setShowWidgetSelector] = useState(false);
@@ -67,9 +69,9 @@ export default function Dashboard() {
         const lastMonth = subMonths(today, 1);
         return { dateFrom: startOfMonth(lastMonth), dateTo: endOfMonth(lastMonth) };
       case 'custom':
-        return { 
-          dateFrom: customDateRange?.from || subDays(today, 6), 
-          dateTo: customDateRange?.to || today 
+        return {
+          dateFrom: customDateRange?.from || subDays(today, 6),
+          dateTo: customDateRange?.to || today
         };
       default:
         return { dateFrom: subDays(today, 6), dateTo: today };
@@ -133,122 +135,126 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6" data-tour="dashboard">
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Bem-vindo ao Dashboard! 👋
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {user?.email}
-            </p>
-          </div>
-          
-          <div className="flex gap-2 flex-wrap items-center">
-            {/* Date Range Filter */}
-            <div className="flex items-center gap-2">
-              <Select value={dateRangePreset} onValueChange={(value: DateRangePreset) => setDateRangePreset(value)}>
-                <SelectTrigger className="w-[160px]">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Período" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7days">Últimos 7 dias</SelectItem>
-                  <SelectItem value="14days">Últimos 14 dias</SelectItem>
-                  <SelectItem value="30days">Últimos 30 dias</SelectItem>
-                  <SelectItem value="thisMonth">Este mês</SelectItem>
-                  <SelectItem value="lastMonth">Mês anterior</SelectItem>
-                  <SelectItem value="custom">Personalizado</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {dateRangePreset === 'custom' && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal", !customDateRange && "text-muted-foreground")}>
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {customDateRange?.from ? (
-                        customDateRange.to ? (
-                          <>
-                            {format(customDateRange.from, "dd/MM/yy", { locale: ptBR })} - {format(customDateRange.to, "dd/MM/yy", { locale: ptBR })}
-                          </>
-                        ) : (
-                          format(customDateRange.from, "dd/MM/yy", { locale: ptBR })
-                        )
-                      ) : (
-                        <span>Selecionar datas</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      initialFocus
-                      mode="range"
-                      defaultMonth={customDateRange?.from}
-                      selected={customDateRange}
-                      onSelect={setCustomDateRange}
-                      numberOfMonths={2}
-                      locale={ptBR}
-                      disabled={(date) => date > new Date()}
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              )}
-            </div>
-
-            {isEditMode ? (
-              <>
-                <Button variant="outline" onClick={handleCancelEdit}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSaveLayout} disabled={isSaving}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Salvar Layout
-                </Button>
-              </>
-            ) : (
-              <>
-                <SyncMetricsButton />
-                <ColumnCustomizer
-                  pageName="dashboard"
-                  availableColumns={AVAILABLE_WIDGETS}
-                  onColumnsChange={setVisibleWidgets}
-                />
-                <Button 
-                  variant="outline" 
-                  onClick={handleResetLayout}
-                  size="sm"
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Resetar
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowWidgetSelector(true)}
-                  size="sm"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Widget
-                </Button>
-                <Button
-                  onClick={() => setIsEditMode(true)}
-                  size="sm"
-                >
-                  <Edit3 className="h-4 w-4 mr-2" />
-                  Editar Layout
-                </Button>
-              </>
-            )}
-          </div>
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Bem-vindo ao Dashboard! 👋
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {user?.email}
+          </p>
         </div>
 
-        {/* Onboarding Checklist */}
-        {!isTourCompleted && (
-          <OnboardingChecklist onStartTour={handleStartTour} />
-        )}
+        <div className="flex gap-2 flex-wrap items-center">
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-2">
+            <Select value={dateRangePreset} onValueChange={(value: DateRangePreset) => setDateRangePreset(value)}>
+              <SelectTrigger className="w-[160px]">
+                <Calendar className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7days">Últimos 7 dias</SelectItem>
+                <SelectItem value="14days">Últimos 14 dias</SelectItem>
+                <SelectItem value="30days">Últimos 30 dias</SelectItem>
+                <SelectItem value="thisMonth">Este mês</SelectItem>
+                <SelectItem value="lastMonth">Mês anterior</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
 
-        {/* Dashboard Grid */}
+            {dateRangePreset === 'custom' && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal", !customDateRange && "text-muted-foreground")}>
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {customDateRange?.from ? (
+                      customDateRange.to ? (
+                        <>
+                          {format(customDateRange.from, "dd/MM/yy", { locale: ptBR })} - {format(customDateRange.to, "dd/MM/yy", { locale: ptBR })}
+                        </>
+                      ) : (
+                        format(customDateRange.from, "dd/MM/yy", { locale: ptBR })
+                      )
+                    ) : (
+                      <span>Selecionar datas</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    initialFocus
+                    mode="range"
+                    defaultMonth={customDateRange?.from}
+                    selected={customDateRange}
+                    onSelect={setCustomDateRange}
+                    numberOfMonths={2}
+                    locale={ptBR}
+                    disabled={(date) => date > new Date()}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+
+
+          {isEditMode ? (
+            <>
+              <Button variant="outline" onClick={handleCancelEdit}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveLayout} disabled={isSaving}>
+                <Save className="h-4 w-4 mr-2" />
+                Salvar Layout
+              </Button>
+            </>
+          ) : (
+            <>
+              <SyncMetricsButton />
+              <ColumnCustomizer
+                pageName="dashboard"
+                availableColumns={AVAILABLE_WIDGETS}
+                onColumnsChange={setVisibleWidgets}
+              />
+              <Button
+                variant="outline"
+                onClick={handleResetLayout}
+                size="sm"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Resetar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowWidgetSelector(true)}
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Widget
+              </Button>
+              <Button
+                onClick={() => setIsEditMode(true)}
+                size="sm"
+              >
+                <Edit3 className="h-4 w-4 mr-2" />
+                Editar Layout
+              </Button>
+            </>
+          )}
+        </div>
+      </div >
+
+      {/* Onboarding Checklist */}
+      {
+        !isTourCompleted && (
+          <OnboardingChecklist onStartTour={handleStartTour} />
+        )
+      }
+
+      {/* Dashboard Grid */}
+      <ErrorBoundary fallback={<ErrorState title="Erro no Dashboard" description="Ocorreu um erro ao carregar o dashboard. Tente recarregar a página." />}>
         <DashboardGrid
           widgets={layout.widgets}
           layouts={currentLayouts}
@@ -258,18 +264,19 @@ export default function Dashboard() {
           dateFrom={dateFrom}
           dateTo={dateTo}
         />
+      </ErrorBoundary>
 
-        {/* Onboarding Tour */}
-        <OnboardingTour run={runTour} onComplete={handleTourComplete} />
+      {/* Onboarding Tour */}
+      <OnboardingTour run={runTour} onComplete={handleTourComplete} />
 
-        {/* Widget Selector */}
-        <WidgetSelector
-          open={showWidgetSelector}
-          onOpenChange={setShowWidgetSelector}
-          onSelectWidget={handleAddWidget}
-          onRemoveWidget={handleRemoveWidgetFromSelector}
-          existingWidgetIds={layout.widgets.map(w => w.id)}
-        />
-      </div>
+      {/* Widget Selector */}
+      <WidgetSelector
+        open={showWidgetSelector}
+        onOpenChange={setShowWidgetSelector}
+        onSelectWidget={handleAddWidget}
+        onRemoveWidget={handleRemoveWidgetFromSelector}
+        existingWidgetIds={layout.widgets.map(w => w.id)}
+      />
+    </div >
   );
 }

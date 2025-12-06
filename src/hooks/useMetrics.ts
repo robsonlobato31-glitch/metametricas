@@ -75,6 +75,9 @@ export const useMetrics = (dateFrom?: Date, dateTo?: Date, accountId?: string, p
       return filteredData as MetricsData[];
     },
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // Data is fresh for 5 minutes
+    gcTime: 30 * 60 * 1000, // Garbage collection time - cache kept for 30 minutes
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
   });
 
   // Calculate totals across all providers

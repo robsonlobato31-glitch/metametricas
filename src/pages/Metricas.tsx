@@ -1,12 +1,11 @@
 import { useState, useMemo } from 'react';
-import { subDays, format, eachDayOfInterval } from 'date-fns';
+import { subDays, format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { DollarSign, Target, TrendingUp, Eye, Percent, ShoppingBag } from 'lucide-react';
+import { DollarSign, Target, Eye, Percent, ShoppingBag } from 'lucide-react';
 
 import { useMetrics } from '@/hooks/useMetrics';
 import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
-import { useAdSetMetrics } from '@/hooks/useAdSetMetrics';
-import { useAdMetrics } from '@/hooks/useAdMetrics';
+import { useDailyMetrics } from '@/hooks/useDailyMetrics';
 
 import { Header } from '@/components/dashboard/Header';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
@@ -29,7 +28,7 @@ export default function Metricas() {
   const [selectedLevel, setSelectedLevel] = useState<MetricLevel>('campaign');
   const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(undefined);
 
-  // Fetch data based on selected level and account
+  // Fetch aggregated totals
   const { totals: campaignTotals, isLoading: campaignLoading, error: campaignError } = useMetrics(
     dateRange?.from,
     dateRange?.to,
@@ -37,41 +36,24 @@ export default function Metricas() {
     'meta'
   );
 
-  // TODO: Re-enable when ad_sets and ads tables are created
-  // const { totals: adSetTotals, isLoading: adSetLoading, error: adSetError } = useAdSetMetrics(
-  //   dateRange?.from,
-  //   dateRange?.to,
-  //   selectedAccountId
-  // );
+  // Fetch daily metrics for timeline
+  const { data: dailyMetrics, isLoading: dailyLoading } = useDailyMetrics(
+    dateRange?.from,
+    dateRange?.to,
+    selectedAccountId
+  );
 
-  // const { totals: adTotals, isLoading: adLoading, error: adError } = useAdMetrics(
-  //   dateRange?.from,
-  //   dateRange?.to,
-  //   selectedAccountId
-  // );
+  // Fetch campaign data for table
+  const { data: campaignsData, isLoading: campaignsLoading, error: campaignsError } = useCampaignMetrics({
+    provider: 'meta',
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    accountId: selectedAccountId,
+  });
 
-  // Temporary fallback values
-  const adSetTotals = null;
-  const adSetLoading = false;
-  const adSetError = null;
-  const adTotals = null;
-  const adLoading = false;
-  const adError = null;
-
-  // Select the appropriate totals based on level
-  const metricsTotals = selectedLevel === 'campaign'
-    ? campaignTotals
-    : selectedLevel === 'ad_set'
-      ? adSetTotals
-      : adTotals;
-
-  const isLoading = selectedLevel === 'campaign'
-    ? campaignLoading
-    : selectedLevel === 'ad_set'
-      ? adSetLoading
-      : adLoading;
-
-  const totals = metricsTotals || {
+  // Use campaign totals as the main source of truth for now
+  // Since ad_sets and ads tables are not ready, we only support campaign level
+  const totals = campaignTotals || {
     spend: 0,
     conversions: 0,
     impressions: 0,
@@ -92,13 +74,8 @@ export default function Metricas() {
     cost_per_message: 0,
   };
 
-  // Fetch campaign data for table
-  const { data: campaignsData, isLoading: campaignsLoading, error: campaignsError } = useCampaignMetrics({
-    provider: 'meta',
-    dateFrom: dateRange?.from,
-    dateTo: dateRange?.to,
-    accountId: selectedAccountId,
-  });
+  const isLoading = campaignLoading || dailyLoading || campaignsLoading;
+  const anyError = campaignError || campaignsError;
 
   // Format functions
   const formatCurrency = (value: number) => {
@@ -112,21 +89,16 @@ export default function Metricas() {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
 
-  // Timeline Data - MUST be before any conditional returns
+  // Timeline Data - Real Data
   const timelineData = useMemo(() => {
-    if (!dateRange?.from || !dateRange?.to) return [];
-
-    const days = eachDayOfInterval({ start: dateRange.from, end: dateRange.to });
-    const avgSpend = totals.spend / days.length;
-
-    return days.map((day) => ({
-      date: format(day, 'dd/MM'),
-      spend: Math.round(avgSpend * (0.8 + Math.random() * 0.4)),
-      revenue: Math.round(avgSpend * 1.5 * (0.8 + Math.random() * 0.4)),
+    return dailyMetrics.map((day) => ({
+      date: format(new Date(day.date), 'dd/MM'),
+      spend: Number(day.spend),
+      revenue: Number(day.revenue),
     }));
-  }, [dateRange, totals]);
+  }, [dailyMetrics]);
 
-  // Campaign Data for Table - MUST be before any conditional returns
+  // Campaign Data for Table
   const campaigns = useMemo(() => {
     if (!campaignsData || !Array.isArray(campaignsData) || campaignsData.length === 0) {
       return [];
@@ -143,22 +115,8 @@ export default function Metricas() {
     }));
   }, [campaignsData]);
 
-  // Debug logs
-  console.log('[Metricas] Debug State:', {
-    selectedLevel,
-    selectedAccountId,
-    isLoading: isLoading || campaignsLoading,
-    campaignError,
-    adSetError,
-    adError,
-    campaignsError,
-    hasCampaignTotals: !!campaignTotals,
-    hasAdSetTotals: !!adSetTotals,
-    hasAdTotals: !!adTotals,
-  });
-
   // Show loading state
-  if (isLoading || campaignsLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-dark-bg text-gray-200 flex items-center justify-center">
         <div className="text-center">
@@ -169,29 +127,18 @@ export default function Metricas() {
     );
   }
 
-  // Show error state for any hook
-  const anyError = campaignError || adSetError || adError || campaignsError;
+  // Show error state
   if (anyError) {
     console.error('[Metricas] Error detected:', anyError);
-
-    // Extract error message
-    const errorMessage = anyError instanceof Error
-      ? anyError.message
-      : typeof anyError === 'object' && anyError !== null
-        ? JSON.stringify(anyError, null, 2)
-        : String(anyError);
+    const errorMessage = anyError instanceof Error ? anyError.message : String(anyError);
 
     return (
       <div className="min-h-screen bg-dark-bg text-gray-200 flex items-center justify-center">
         <div className="text-center max-w-md">
           <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 mb-4">
             <h3 className="text-red-400 font-bold mb-2">Erro ao carregar dados</h3>
-            <p className="text-gray-400 text-sm mb-2">
-              Não foi possível carregar os dados. Por favor, tente novamente.
-            </p>
-            <p className="text-gray-500 text-xs font-mono whitespace-pre-wrap">
-              {errorMessage}
-            </p>
+            <p className="text-gray-400 text-sm mb-2">Não foi possível carregar os dados.</p>
+            <p className="text-gray-500 text-xs font-mono whitespace-pre-wrap">{errorMessage}</p>
           </div>
           <button
             onClick={() => window.location.reload()}
@@ -205,13 +152,8 @@ export default function Metricas() {
   }
 
   // Check if we have any data at all
-  const hasAnyData = metricsTotals && (
-    metricsTotals.impressions > 0 ||
-    metricsTotals.clicks > 0 ||
-    metricsTotals.spend > 0
-  );
+  const hasAnyData = totals.impressions > 0 || totals.clicks > 0 || totals.spend > 0;
 
-  // Show empty state if no data
   if (!hasAnyData) {
     return (
       <div className="min-h-screen bg-dark-bg text-gray-200">
@@ -255,7 +197,7 @@ export default function Metricas() {
     { label: 'CTR', value: `${(totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0).toFixed(2)}%`, icon: Percent },
   ];
 
-  // Funnel Data
+  // Funnel Data - Real Data
   const funnelData: FunnelStep[] = [
     {
       label: 'Alcance',
@@ -264,37 +206,32 @@ export default function Metricas() {
     },
     {
       label: 'Visualizações',
-      value: formatNumber(Math.round(totals.impressions * 0.3)),
+      value: formatNumber(totals.page_views),
       subLabel: 'Visualizações de página',
-      percent: '30%'
+      percent: totals.impressions > 0 ? `${((totals.page_views / totals.impressions) * 100).toFixed(1)}%` : '0%'
     },
     {
       label: 'Cliques',
       value: formatNumber(totals.clicks),
       subLabel: 'Cliques no link',
-      percent: `${(totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0).toFixed(2)}%`
+      percent: totals.impressions > 0 ? `${((totals.clicks / totals.impressions) * 100).toFixed(2)}%` : '0%'
     },
     {
       label: 'Add Carrinho',
-      value: formatNumber(Math.round(totals.clicks * 0.1)),
+      value: formatNumber(totals.initiated_checkout),
       subLabel: 'Adições ao carrinho',
-      percent: '10%'
+      percent: totals.clicks > 0 ? `${((totals.initiated_checkout / totals.clicks) * 100).toFixed(1)}%` : '0%'
     },
     {
       label: 'Compras',
       value: formatNumber(totals.conversions),
       subLabel: 'Compras realizadas',
-      percent: `${(totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0).toFixed(2)}%`
+      percent: totals.clicks > 0 ? `${((totals.conversions / totals.clicks) * 100).toFixed(2)}%` : '0%'
     },
   ];
 
-  // Demographics Data
-  const demographicsData = [
-    { name: '18-24', value: 25, color: '#3b82f6' },
-    { name: '25-34', value: 35, color: '#60a5fa' },
-    { name: '35-44', value: 20, color: '#93c5fd' },
-    { name: '45+', value: 20, color: '#bfdbfe' },
-  ];
+  // Demographics Data - Empty for now as we don't have real data source yet
+  const demographicsData: any[] = [];
 
   return (
     <div className="min-h-screen bg-dark-bg text-gray-200 font-sans selection:bg-brand-500/30 overflow-x-hidden">
@@ -338,7 +275,7 @@ export default function Metricas() {
           <div className="text-center text-[10px] text-gray-700 py-8 flex items-center justify-center gap-2">
             <span>Desenvolvimento</span>
             <span className="w-1 h-1 bg-gray-700 rounded-full"></span>
-            <span className="font-bold text-gray-600">DASH PRO</span>
+            <span className="font-bold text-gray-600">ROBSON LOBATO</span>
           </div>
         </div>
       </main>
