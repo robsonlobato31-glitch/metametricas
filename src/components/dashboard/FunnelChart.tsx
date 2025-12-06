@@ -23,7 +23,7 @@ export const FunnelChart: React.FC<FunnelChartProps> = ({ data }) => {
 
             <div className="flex-1 flex flex-col items-center justify-start gap-1 py-4">
                 {data.map((step, index) => {
-                    const widths = ['100%', '85%', '70%', '55%', '40%'];
+                    const widths = ['100%', '85%', '70%', '55%', '40%', '25%'];
                     const width = widths[index] || '40%';
                     const isLast = index === data.length - 1;
 

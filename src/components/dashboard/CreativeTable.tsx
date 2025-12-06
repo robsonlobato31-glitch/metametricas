@@ -5,8 +5,12 @@ import { Image, MessageSquare } from 'lucide-react';
 interface CreativeData {
     id: string;
     name: string;
-    purchases: number;
+    budget: number;
     messages: number;
+    cost_per_message: number;
+    spend: number;
+    ctr: number;
+    cpm: number;
 }
 
 interface CreativeTableProps {
@@ -30,8 +34,12 @@ export const CreativeTable: React.FC<CreativeTableProps> = ({ creatives }) => {
                     <TableHeader className="border-dark-border">
                         <TableRow className="border-dark-border hover:bg-transparent">
                             <TableHead className="text-gray-500 text-[10px] uppercase font-bold">Ad Name</TableHead>
-                            <TableHead className="text-gray-500 text-[10px] uppercase font-bold text-right">Compras</TableHead>
+                            <TableHead className="text-gray-500 text-[10px] uppercase font-bold text-right">Orçamento</TableHead>
                             <TableHead className="text-gray-500 text-[10px] uppercase font-bold text-right">Msgs</TableHead>
+                            <TableHead className="text-gray-500 text-[10px] uppercase font-bold text-right">Custo/Msg</TableHead>
+                            <TableHead className="text-gray-500 text-[10px] uppercase font-bold text-right">Gasto</TableHead>
+                            <TableHead className="text-gray-500 text-[10px] uppercase font-bold text-right">CTR</TableHead>
+                            <TableHead className="text-gray-500 text-[10px] uppercase font-bold text-right">CPM</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -40,13 +48,17 @@ export const CreativeTable: React.FC<CreativeTableProps> = ({ creatives }) => {
                                 <TableCell className="font-medium text-gray-300 text-xs py-3">
                                     <span className="truncate max-w-[150px] block">{creative.name}</span>
                                 </TableCell>
-                                <TableCell className="text-right text-gray-300 text-xs py-3">{creative.purchases}</TableCell>
+                                <TableCell className="text-right text-gray-300 text-xs py-3">R$ {(creative.budget || 0).toFixed(2)}</TableCell>
                                 <TableCell className="text-right text-gray-300 text-xs py-3">{creative.messages}</TableCell>
+                                <TableCell className="text-right text-gray-300 text-xs py-3">R$ {(creative.cost_per_message || 0).toFixed(2)}</TableCell>
+                                <TableCell className="text-right text-gray-300 text-xs py-3">R$ {(creative.spend || 0).toFixed(2)}</TableCell>
+                                <TableCell className="text-right text-gray-300 text-xs py-3">{(creative.ctr || 0).toFixed(2)}%</TableCell>
+                                <TableCell className="text-right text-gray-300 text-xs py-3">R$ {(creative.cpm || 0).toFixed(2)}</TableCell>
                             </TableRow>
                         ))}
                         {creatives.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={3} className="text-center text-gray-500 py-8">
+                                <TableCell colSpan={7} className="text-center text-gray-500 py-8">
                                     Nenhum criativo encontrado
                                 </TableCell>
                             </TableRow>

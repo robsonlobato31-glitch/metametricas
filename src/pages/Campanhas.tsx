@@ -90,7 +90,7 @@ export default function Campanhas() {
     ...advancedFilters,
   });
 
-  const { data: adAccounts } = useAdAccounts();
+  const { data: adAccounts } = useAdAccounts(provider, status);
 
   // Fetch comparison data for trend indicators
   const { data: comparisonCampaigns } = useCampaignMetrics({
@@ -421,7 +421,6 @@ export default function Campanhas() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="ACTIVE">Ativas</SelectItem>
                 <SelectItem value="PAUSED">Pausadas</SelectItem>
-                <SelectItem value="DELETED">Deletadas</SelectItem>
                 <SelectItem value="HAD_DELIVERY">Veiculadas</SelectItem>
               </SelectContent>
             </Select>

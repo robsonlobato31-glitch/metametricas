@@ -3,9 +3,10 @@ import { subDays, format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { DollarSign, Target, Eye, Percent, ShoppingBag } from 'lucide-react';
 
-import { useMetrics } from '@/hooks/useMetrics';
 import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
 import { useDailyMetrics } from '@/hooks/useDailyMetrics';
+import { useDemographics } from '@/hooks/useDemographics';
+import { useTopCreatives } from '@/hooks/useTopCreatives';
 
 import { Header } from '@/components/dashboard/Header';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
@@ -26,55 +27,148 @@ export default function Metricas() {
 
   const [selectedLevel, setSelectedLevel] = useState<MetricLevel>('campaign');
   const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(undefined);
-
-  // Fetch aggregated totals
-  const { totals: campaignTotals, isLoading: campaignLoading, error: campaignError } = useMetrics(
-    dateRange?.from,
-    dateRange?.to,
-    selectedAccountId,
-    'meta'
-  );
+  const [status, setStatus] = useState<string | undefined>(undefined);
 
   // Fetch daily metrics for timeline
   const { data: dailyMetrics, isLoading: dailyLoading } = useDailyMetrics(
     dateRange?.from,
     dateRange?.to,
-    selectedAccountId
+    selectedAccountId,
+    status
   );
 
-  // Fetch campaign data for table
+  // Fetch campaign data (includes metrics)
   const { data: campaignsData, isLoading: campaignsLoading, error: campaignsError } = useCampaignMetrics({
     provider: 'meta',
     dateFrom: dateRange?.from,
     dateTo: dateRange?.to,
     accountId: selectedAccountId,
+    status: status,
   });
 
-  // Use campaign totals as the main source of truth for now
-  // Since ad_sets and ads tables are not ready, we only support campaign level
-  const totals = campaignTotals || {
-    spend: 0,
-    conversions: 0,
-    impressions: 0,
-    clicks: 0,
-    link_clicks: 0,
-    page_views: 0,
-    initiated_checkout: 0,
-    purchases: 0,
-    video_views_25: 0,
-    video_views_50: 0,
-    video_views_75: 0,
-    video_views_100: 0,
-    results: 0,
-    messages: 0,
-    ctr: 0,
-    cpc: 0,
-    cost_per_result: 0,
-    cost_per_message: 0,
-  };
+  // Calculate totals from campaignsData
+  const totals = useMemo(() => {
+    if (!campaignsData || !Array.isArray(campaignsData)) {
+      return {
+        spend: 0,
+        conversions: 0,
+        impressions: 0,
+        clicks: 0,
+        link_clicks: 0,
+        page_views: 0,
+        initiated_checkout: 0,
+        purchases: 0,
+        video_views_25: 0,
+        video_views_50: 0,
+        video_views_75: 0,
+        video_views_100: 0,
+        results: 0,
+        messages: 0,
+        ctr: 0,
+        cpc: 0,
+        cost_per_result: 0,
+        cost_per_result: 0,
+        cost_per_message: 0,
+        budget: 0,
+        cpm: 0,
+      };
+    }
 
-  const isLoading = campaignLoading || dailyLoading || campaignsLoading;
-  const anyError = campaignError || campaignsError;
+    const aggregated = campaignsData.reduce((acc, curr) => ({
+      budget: acc.budget + (curr.budget || 0),
+      spend: acc.spend + (curr.spend || 0),
+      conversions: acc.conversions + (curr.conversions || 0),
+      impressions: acc.impressions + (curr.impressions || 0),
+      clicks: acc.clicks + (curr.clicks || 0),
+      link_clicks: acc.link_clicks + (curr.link_clicks || 0),
+      page_views: acc.page_views + (curr.page_views || 0),
+      initiated_checkout: acc.initiated_checkout + (curr.initiated_checkout || 0),
+      purchases: acc.purchases + (curr.purchases || 0),
+      video_views_25: acc.video_views_25 + (curr.video_views_25 || 0),
+      video_views_50: acc.video_views_50 + (curr.video_views_50 || 0),
+      video_views_75: acc.video_views_75 + (curr.video_views_75 || 0),
+      video_views_100: acc.video_views_100 + (curr.video_views_100 || 0),
+      results: acc.results + (curr.results || 0),
+      messages: acc.messages + (curr.messages || 0),
+    }), {
+      budget: 0, spend: 0, conversions: 0, impressions: 0, clicks: 0, link_clicks: 0,
+      page_views: 0, initiated_checkout: 0, purchases: 0,
+      video_views_25: 0, video_views_50: 0, video_views_75: 0, video_views_100: 0,
+      results: 0, messages: 0,
+      ctr: 0, cpc: 0, cpm: 0, cost_per_result: 0, cost_per_message: 0
+    });
+
+    // Calculate derived metrics
+    return {
+      ...aggregated,
+      ctr: aggregated.impressions > 0 ? (aggregated.clicks / aggregated.impressions) * 100 : 0,
+      cpc: aggregated.clicks > 0 ? aggregated.spend / aggregated.clicks : 0,
+      cpm: aggregated.impressions > 0 ? (aggregated.spend / aggregated.impressions) * 1000 : 0,
+      cost_per_result: aggregated.results > 0 ? aggregated.spend / aggregated.results : 0,
+      cost_per_message: aggregated.messages > 0 ? aggregated.spend / aggregated.messages : 0,
+    };
+  }, [campaignsData]);
+
+  // Video Funnel Data
+  const videoMetrics = useMemo(() => {
+    const impressions = totals.impressions || 1; // Avoid division by zero
+    return [
+      {
+        label: 'VV 100%',
+        percentage: (totals.video_views_100 / impressions) * 100,
+        value: `${((totals.video_views_100 / impressions) * 100).toFixed(2)}%`
+      },
+      {
+        label: 'VV 75%',
+        percentage: (totals.video_views_75 / impressions) * 100,
+        value: `${((totals.video_views_75 / impressions) * 100).toFixed(2)}%`
+      },
+      {
+        label: 'VV 50%',
+        percentage: (totals.video_views_50 / impressions) * 100,
+        value: `${((totals.video_views_50 / impressions) * 100).toFixed(2)}%`
+      },
+      {
+        label: 'VV 25%',
+        percentage: (totals.video_views_25 / impressions) * 100,
+        value: `${((totals.video_views_25 / impressions) * 100).toFixed(2)}%`
+      },
+    ];
+  }, [totals]);
+
+  // Fetch Demographics
+  const { data: demographicsData, isLoading: demographicsLoading } = useDemographics(
+    dateRange?.from,
+    dateRange?.to,
+    selectedAccountId === 'all' ? undefined : selectedAccountId,
+    status
+  );
+
+  // Fetch Top Creatives
+  const { data: topCreatives, isLoading: creativesLoading } = useTopCreatives(
+    dateRange?.from,
+    dateRange?.to,
+    selectedAccountId === 'all' ? undefined : selectedAccountId,
+    status
+  );
+
+  // Map creatives for table
+  const creativeTableData = useMemo(() => {
+    if (!topCreatives) return [];
+    return topCreatives.map(c => ({
+      id: c.ad_id,
+      name: c.ad_name,
+      budget: 0, // Budget not available at ad level in this context
+      messages: c.messages || 0,
+      cost_per_message: c.cost_per_message || 0,
+      spend: c.spend || 0,
+      ctr: c.ctr || 0,
+      cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0
+    }));
+  }, [topCreatives]);
+
+  const isLoading = dailyLoading || campaignsLoading || demographicsLoading || creativesLoading;
+  const anyError = campaignsError;
 
   // Format functions
   const formatCurrency = (value: number) => {
@@ -106,10 +200,11 @@ export default function Metricas() {
     return campaignsData.slice(0, 5).map(c => ({
       id: c.campaign_id || '',
       name: c.campaign_name || 'Sem nome',
-      purchases: c.conversions || 0,
+      budget: c.budget || 0,
+      messages: c.messages || 0,
+      cost_per_message: c.cost_per_message || 0,
+      spend: c.spend || 0,
       ctr: c.ctr || 0,
-      clicks: c.clicks || 0,
-      roas: 0,
       cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0
     }));
   }, [campaignsData]);
@@ -165,6 +260,8 @@ export default function Metricas() {
             selectedAccountId={selectedAccountId}
             onAccountChange={setSelectedAccountId}
             provider="meta"
+            status={status}
+            onStatusChange={setStatus}
           />
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center max-w-md">
@@ -188,49 +285,51 @@ export default function Metricas() {
 
   // KPI Data
   const kpiData: KPI[] = [
-    { label: 'Investimento', value: formatCurrency(totals.spend), icon: DollarSign },
-    { label: 'Resultado', value: formatNumber(totals.conversions), icon: ShoppingBag },
-    { label: 'Custo/Resultado', value: formatCurrency(totals.conversions > 0 ? totals.spend / totals.conversions : 0), icon: Target },
-    { label: 'Retorno', value: formatCurrency(0), icon: DollarSign },
-    { label: 'CPM', value: formatCurrency(totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0), icon: Eye },
-    { label: 'CTR', value: `${(totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0).toFixed(2)}%`, icon: Percent },
+    { label: 'Orçamento', value: formatCurrency(totals.budget), icon: DollarSign },
+    { label: 'Mensagens', value: formatNumber(totals.messages), icon: ShoppingBag },
+    { label: 'Custo/Mensagem', value: formatCurrency(totals.cost_per_message), icon: Target },
+    { label: 'Gasto', value: formatCurrency(totals.spend), icon: DollarSign },
+    { label: 'CTR', value: `${totals.ctr.toFixed(2)}%`, icon: Percent },
+    { label: 'CPM', value: formatCurrency(totals.cpm), icon: Eye },
   ];
 
   // Funnel Data - Real Data
   const funnelData: FunnelStep[] = [
     {
-      label: 'Alcance',
-      value: formatNumber(totals.impressions),
-      subLabel: 'Pessoas alcançadas'
+      label: 'Orçamento',
+      value: formatCurrency(totals.budget),
+      subLabel: 'Orçamento total'
     },
     {
-      label: 'Visualizações',
-      value: formatNumber(totals.page_views),
-      subLabel: 'Visualizações de página',
-      percent: totals.impressions > 0 ? `${((totals.page_views / totals.impressions) * 100).toFixed(1)}%` : '0%'
+      label: 'Gasto',
+      value: formatCurrency(totals.spend),
+      subLabel: 'Valor gasto',
+      percent: totals.budget > 0 ? `${((totals.spend / totals.budget) * 100).toFixed(2)}%` : '0%'
     },
     {
-      label: 'Cliques',
-      value: formatNumber(totals.clicks),
-      subLabel: 'Cliques no link',
-      percent: totals.impressions > 0 ? `${((totals.clicks / totals.impressions) * 100).toFixed(2)}%` : '0%'
+      label: 'CPM',
+      value: formatCurrency(totals.cpm),
+      subLabel: 'Custo por mil'
     },
     {
-      label: 'Add Carrinho',
-      value: formatNumber(totals.initiated_checkout),
-      subLabel: 'Adições ao carrinho',
-      percent: totals.clicks > 0 ? `${((totals.initiated_checkout / totals.clicks) * 100).toFixed(1)}%` : '0%'
+      label: 'CTR',
+      value: `${totals.ctr.toFixed(2)}%`,
+      subLabel: 'Taxa de cliques'
     },
     {
-      label: 'Compras',
-      value: formatNumber(totals.conversions),
-      subLabel: 'Compras realizadas',
-      percent: totals.clicks > 0 ? `${((totals.conversions / totals.clicks) * 100).toFixed(2)}%` : '0%'
+      label: 'Mensagens',
+      value: formatNumber(totals.messages),
+      subLabel: 'Total de mensagens'
+    },
+    {
+      label: 'Custo/Msg',
+      value: formatCurrency(totals.cost_per_message),
+      subLabel: 'Custo por mensagem'
     },
   ];
 
   // Demographics Data - Empty for now as we don't have real data source yet
-  const demographicsData: any[] = [];
+  // const demographicsData: any[] = []; // REMOVED
 
   return (
     <div className="min-h-screen bg-dark-bg text-gray-200 font-sans selection:bg-brand-500/30 overflow-x-hidden">
@@ -244,6 +343,8 @@ export default function Metricas() {
             selectedAccountId={selectedAccountId}
             onAccountChange={setSelectedAccountId}
             provider="meta"
+            status={status}
+            onStatusChange={setStatus}
           />
 
           <div className="grid grid-cols-12 gap-6 animate-fade-in">
@@ -261,9 +362,9 @@ export default function Metricas() {
 
             {/* Right Column */}
             <div className="col-span-12 md:col-span-6 xl:col-span-4 flex flex-col gap-6">
-              <DemographicsChart data={demographicsData} />
-              <VideoFunnel />
-              <CreativeTable creatives={[]} />
+              <DemographicsChart data={(demographicsData?.age as any) || []} />
+              <VideoFunnel metrics={videoMetrics} />
+              <CreativeTable creatives={creativeTableData} />
             </div>
           </div>
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { SyncMetricsButton } from '@/components/SyncMetricsButton';
 import { DateRange } from 'react-day-picker';
-import { ChevronDown, Layers, Grid, Layout, Building2 } from 'lucide-react';
+import { ChevronDown, Layers, Grid, Layout, Building2, Activity } from 'lucide-react';
 import { MetricLevel } from './types';
 import { useAdAccounts } from '@/hooks/useAdAccounts';
 import {
@@ -21,6 +21,8 @@ interface HeaderProps {
     selectedAccountId?: string;
     onAccountChange: (accountId: string | undefined) => void;
     provider?: 'meta' | 'google' | 'all';
+    status?: string;
+    onStatusChange?: (status: string | undefined) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,9 +32,11 @@ export const Header: React.FC<HeaderProps> = ({
     onLevelChange,
     selectedAccountId,
     onAccountChange,
-    provider = 'all'
+    provider = 'all',
+    status,
+    onStatusChange
 }) => {
-    const { data: adAccounts, isLoading: loadingAccounts } = useAdAccounts('meta');
+    const { data: adAccounts, isLoading: loadingAccounts } = useAdAccounts('meta', status);
 
     return (
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 bg-dark-card border border-dark-border p-4 rounded-2xl relative overflow-hidden">
@@ -44,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <Layout className="text-brand-500 w-6 h-6" />
                 </div>
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-100 tracking-tight">Campaign Tracking Dashboard</h1>
+                    <h1 className="text-2xl font-bold text-gray-100 tracking-tight">DashTracking</h1>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                         <span>Atualizado em tempo real</span>
@@ -53,6 +57,28 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+                {/* Status Selector */}
+                {onStatusChange && (
+                    <Select
+                        value={status}
+                        onValueChange={(v) => onStatusChange(v === 'all' ? undefined : v)}
+                    >
+                        <SelectTrigger className="w-[140px] bg-dark-bg border-dark-border text-gray-200 hover:border-brand-500/50">
+                            <div className="flex items-center gap-2">
+                                <Activity size={14} className="text-brand-500" />
+                                <SelectValue placeholder="Status" />
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent className="bg-dark-card border-dark-border">
+                            <SelectItem value="all" className="text-gray-200 hover:bg-dark-bg focus:bg-dark-bg">Todos</SelectItem>
+                            <SelectItem value="ACTIVE" className="text-gray-200 hover:bg-dark-bg focus:bg-dark-bg">Ativas</SelectItem>
+                            <SelectItem value="PAUSED" className="text-gray-200 hover:bg-dark-bg focus:bg-dark-bg">Pausadas</SelectItem>
+                            <SelectItem value="WITH_SPEND" className="text-gray-200 hover:bg-dark-bg focus:bg-dark-bg">Com Gastos</SelectItem>
+                            <SelectItem value="HAD_DELIVERY" className="text-gray-200 hover:bg-dark-bg focus:bg-dark-bg">Veiculadas</SelectItem>
+                        </SelectContent>
+                    </Select>
+                )}
+
                 {/* Ad Account Selector */}
                 <Select value={selectedAccountId || 'all'} onValueChange={(value) => onAccountChange(value === 'all' ? undefined : value)}>
                     <SelectTrigger className="w-[200px] bg-dark-bg border-dark-border text-gray-200 hover:border-brand-500/50">
@@ -120,15 +146,6 @@ export const Header: React.FC<HeaderProps> = ({
                 />
 
                 <SyncMetricsButton provider={provider} />
-
-                <div className="h-8 w-[1px] bg-dark-border mx-1"></div>
-
-                <button className="flex items-center gap-2 bg-dark-bg border border-dark-border hover:border-brand-500/50 transition-colors rounded-lg px-3 py-2">
-                    <div className="w-6 h-6 rounded-full bg-brand-900 flex items-center justify-center text-brand-200 text-xs font-bold">
-                        U
-                    </div>
-                    <ChevronDown size={14} className="text-gray-500" />
-                </button>
             </div>
         </div>
     );

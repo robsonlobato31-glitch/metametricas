@@ -8,17 +8,12 @@ interface VideoMetric {
 }
 
 interface VideoFunnelProps {
-    data?: VideoMetric[];
+    metrics?: VideoMetric[];
 }
 
-export const VideoFunnel: React.FC<VideoFunnelProps> = ({ data }) => {
-    // Default data if none provided
-    const metrics = data || [
-        { label: 'VV 100%', percentage: 7.57, value: '7.57%' },
-        { label: 'VV 75%', percentage: 4.63, value: '4.63%' },
-        { label: 'VV 50%', percentage: 2.57, value: '2.57%' },
-        { label: 'VV 25%', percentage: 1.87, value: '1.87%' },
-    ];
+export const VideoFunnel: React.FC<VideoFunnelProps> = ({ metrics }) => {
+    // Use provided metrics or empty array if loading/undefined
+    const displayMetrics = metrics || [];
 
     return (
         <div className="bg-dark-card border border-dark-border rounded-2xl p-6">
@@ -32,7 +27,7 @@ export const VideoFunnel: React.FC<VideoFunnelProps> = ({ data }) => {
             </div>
 
             <div className="space-y-4">
-                {metrics.map((metric, index) => (
+                {displayMetrics.map((metric, index) => (
                     <div key={index} className="space-y-1">
                         <div className="flex justify-between text-xs text-gray-400">
                             <span>{metric.label}</span>

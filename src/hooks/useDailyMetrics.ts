@@ -12,14 +12,14 @@ export interface DailyMetric {
     conversions: number;
 }
 
-export const useDailyMetrics = (dateFrom?: Date, dateTo?: Date, accountId?: string) => {
+export const useDailyMetrics = (dateFrom?: Date, dateTo?: Date, accountId?: string, status?: string) => {
     const { user } = useAuth();
 
     const dateFromStr = dateFrom ? format(dateFrom, 'yyyy-MM-dd') : format(subDays(new Date(), 30), 'yyyy-MM-dd');
     const dateToStr = dateTo ? format(dateTo, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
 
     const { data, isLoading, error } = useQuery({
-        queryKey: ['daily-metrics', user?.id, dateFromStr, dateToStr, accountId],
+        queryKey: ['daily-metrics', user?.id, dateFromStr, dateToStr, accountId, status],
         queryFn: async () => {
             if (!user?.id) return [];
 
@@ -28,6 +28,7 @@ export const useDailyMetrics = (dateFrom?: Date, dateTo?: Date, accountId?: stri
                 p_date_from: dateFromStr,
                 p_date_to: dateToStr,
                 p_account_id: accountId || null,
+                p_status: status === 'WITH_SPEND' ? null : (status || null),
             });
 
             if (error) {
