@@ -15,7 +15,6 @@ import { DemographicsChart } from '@/components/dashboard/DemographicsChart';
 import { VideoFunnel } from '@/components/dashboard/VideoFunnel';
 import { CampaignTable } from '@/components/dashboard/CampaignTable';
 import { CreativeTable } from '@/components/dashboard/CreativeTable';
-import { UTMTable } from '@/components/dashboard/UTMTable';
 
 import { KPI, FunnelStep, MetricLevel } from '@/components/dashboard/types';
 
@@ -266,10 +265,6 @@ export default function Metricas() {
               <VideoFunnel />
               <CreativeTable creatives={[]} />
             </div>
-          </div>
-
-          <div className="mt-6">
-            <UTMTable utm={[]} />
           </div>
 
           <div className="text-center text-[10px] text-gray-700 py-8 flex items-center justify-center gap-2">

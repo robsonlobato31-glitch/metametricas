@@ -34,4 +34,3 @@ export const demographicsData = [
 
 export const campaigns = [];
 export const creatives = [];
-export const utmData = [];
