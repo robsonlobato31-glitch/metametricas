@@ -48,30 +48,15 @@ export default function Metricas() {
 
   // Calculate totals from campaignsData
   const totals = useMemo(() => {
+    const defaultTotals = {
+      spend: 0, conversions: 0, impressions: 0, clicks: 0, link_clicks: 0,
+      page_views: 0, initiated_checkout: 0, purchases: 0,
+      video_views_25: 0, video_views_50: 0, video_views_75: 0, video_views_100: 0,
+      results: 0, messages: 0, ctr: 0, cpc: 0, cost_per_result: 0, cost_per_message: 0, budget: 0, cpm: 0,
+    };
+
     if (!campaignsData || !Array.isArray(campaignsData)) {
-      return {
-        spend: 0,
-        conversions: 0,
-        impressions: 0,
-        clicks: 0,
-        link_clicks: 0,
-        page_views: 0,
-        initiated_checkout: 0,
-        purchases: 0,
-        video_views_25: 0,
-        video_views_50: 0,
-        video_views_75: 0,
-        video_views_100: 0,
-        results: 0,
-        messages: 0,
-        ctr: 0,
-        cpc: 0,
-        cost_per_result: 0,
-        cost_per_result: 0,
-        cost_per_message: 0,
-        budget: 0,
-        cpm: 0,
-      };
+      return defaultTotals;
     }
 
     const aggregated = campaignsData.reduce((acc, curr) => ({
@@ -94,11 +79,9 @@ export default function Metricas() {
       budget: 0, spend: 0, conversions: 0, impressions: 0, clicks: 0, link_clicks: 0,
       page_views: 0, initiated_checkout: 0, purchases: 0,
       video_views_25: 0, video_views_50: 0, video_views_75: 0, video_views_100: 0,
-      results: 0, messages: 0,
-      ctr: 0, cpc: 0, cpm: 0, cost_per_result: 0, cost_per_message: 0
+      results: 0, messages: 0
     });
 
-    // Calculate derived metrics
     return {
       ...aggregated,
       ctr: aggregated.impressions > 0 ? (aggregated.clicks / aggregated.impressions) * 100 : 0,
@@ -143,6 +126,19 @@ export default function Metricas() {
     selectedAccountId === 'all' ? undefined : selectedAccountId,
     status
   );
+
+  // Transform demographics for chart format
+  const demographicChartData = useMemo(() => {
+    if (!demographicsData?.age || demographicsData.age.length === 0) return [];
+    
+    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+    
+    return (demographicsData.age as any[]).slice(0, 6).map((item: any, index: number) => ({
+      name: item.breakdown_value,
+      value: item.impressions || 0,
+      color: colors[index % colors.length]
+    }));
+  }, [demographicsData]);
 
   // Fetch Top Creatives
   const { data: topCreatives, isLoading: creativesLoading } = useTopCreatives(
@@ -362,7 +358,7 @@ export default function Metricas() {
 
             {/* Right Column */}
             <div className="col-span-12 md:col-span-6 xl:col-span-4 flex flex-col gap-6">
-              <DemographicsChart data={(demographicsData?.age as any) || []} />
+              <DemographicsChart data={demographicChartData} />
               <VideoFunnel metrics={videoMetrics} />
               <CreativeTable creatives={creativeTableData} />
             </div>

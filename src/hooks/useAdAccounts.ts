@@ -45,16 +45,23 @@ export const useAdAccounts = (provider?: 'meta' | 'google', status?: string) => 
 
       if (status) {
         if (status === 'WITH_SPEND') {
-          // Fetch accounts that have spend using the RPC
-          const { data: accountsWithSpend, error: spendError } = await supabase.rpc('get_accounts_with_spend', {
-            p_user_id: user.id
-          });
+          // Fetch accounts that have spend by querying metrics table directly
+          const { data: metricsWithSpend, error: spendError } = await supabase
+            .from('metrics')
+            .select(`
+              campaign_id,
+              campaigns!inner(
+                ad_account_id
+              )
+            `)
+            .gt('spend', 0);
 
           if (spendError) {
             console.error('Error fetching accounts with spend:', spendError);
-            // Fallback: don't filter if error
-          } else if (accountsWithSpend) {
-            const spendAccountIds = new Set(accountsWithSpend.map((a: any) => a.account_id));
+          } else if (metricsWithSpend) {
+            const spendAccountIds = new Set(
+              metricsWithSpend.map((m: any) => m.campaigns?.ad_account_id).filter(Boolean)
+            );
             filteredData = data.filter(account => spendAccountIds.has(account.id));
           }
         } else if (status === 'HAD_DELIVERY') {

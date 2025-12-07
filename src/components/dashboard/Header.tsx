@@ -81,13 +81,15 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {/* Ad Account Selector */}
                 <Select value={selectedAccountId || 'all'} onValueChange={(value) => onAccountChange(value === 'all' ? undefined : value)}>
-                    <SelectTrigger className="w-[200px] bg-dark-bg border-dark-border text-gray-200 hover:border-brand-500/50">
-                        <div className="flex items-center gap-2">
-                            <Building2 size={14} className="text-brand-500" />
-                            <SelectValue placeholder="Todas as contas" />
+                    <SelectTrigger className="w-[260px] bg-dark-bg border-dark-border text-gray-200 hover:border-brand-500/50">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <Building2 size={14} className="text-brand-500 flex-shrink-0" />
+                            <span className="truncate">
+                                <SelectValue placeholder="Todas as contas" />
+                            </span>
                         </div>
                     </SelectTrigger>
-                    <SelectContent className="bg-dark-card border-dark-border">
+                    <SelectContent className="bg-dark-card border-dark-border max-w-[300px]">
                         <SelectItem value="all" className="text-gray-200 hover:bg-dark-bg focus:bg-dark-bg">
                             Todas as contas
                         </SelectItem>
@@ -97,7 +99,9 @@ export const Header: React.FC<HeaderProps> = ({
                                 value={account.id}
                                 className="text-gray-200 hover:bg-dark-bg focus:bg-dark-bg"
                             >
-                                {account.account_name}
+                                <span className="truncate block max-w-[220px]" title={account.account_name}>
+                                    {account.account_name}
+                                </span>
                             </SelectItem>
                         ))}
                     </SelectContent>
