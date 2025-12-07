@@ -266,6 +266,25 @@ serve(async (req) => {
           costPerMessage = parseFloat(insight.spend) / messages;
         }
 
+        // Extract video views
+        let videoViews25 = 0;
+        let videoViews50 = 0;
+        let videoViews75 = 0;
+        let videoViews100 = 0;
+
+        if (insight.video_p25_watched_actions) {
+          videoViews25 = insight.video_p25_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
+        }
+        if (insight.video_p50_watched_actions) {
+          videoViews50 = insight.video_p50_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
+        }
+        if (insight.video_p75_watched_actions) {
+          videoViews75 = insight.video_p75_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
+        }
+        if (insight.video_p100_watched_actions) {
+          videoViews100 = insight.video_p100_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
+        }
+
         const metric: any = {
           campaign_id: campaignIdUUID,
           date: insight.date_start,
@@ -283,6 +302,10 @@ serve(async (req) => {
           messages: messages || 0,
           cost_per_result: costPerResult || 0,
           cost_per_message: costPerMessage || 0,
+          video_views_25: videoViews25,
+          video_views_50: videoViews50,
+          video_views_75: videoViews75,
+          video_views_100: videoViews100,
         };
 
         // Adicionar IDs específicos de nível
@@ -324,8 +347,9 @@ serve(async (req) => {
     };
 
     // Processar campanha e retornar métricas para batch insert
-    const processCampaign = async (campaign: any): Promise<{ metrics: any[], errors: number }> => {
+    const processCampaign = async (campaign: any): Promise<{ metrics: any[], breakdowns: any[], errors: number }> => {
       const campaignMetrics: any[] = [];
+      const breakdowns: any[] = [];
       let campaignErrors = 0;
 
       try {
@@ -334,7 +358,7 @@ serve(async (req) => {
         const since = date30DaysAgo.toISOString().split('T')[0];
         const until = new Date().toISOString().split('T')[0];
 
-        const fields = 'date_start,impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr,cpc,adset_id,ad_id';
+        const fields = 'date_start,impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr,cpc,adset_id,ad_id,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
         const timeRange = `{"since":"${since}","until":"${until}"}`;
 
         // 1. Nível Campanha
@@ -380,23 +404,75 @@ serve(async (req) => {
           campaignErrors++;
         }
 
+        // 4. Buscar breakdowns demográficos (idade e gênero)
+        const demographicFields = 'date_start,impressions,clicks,spend,conversions';
+        const ageUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?` +
+          `level=campaign&fields=${demographicFields}&time_range=${timeRange}&breakdowns=age&time_increment=1&access_token=${accessToken}`;
+        const genderUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?` +
+          `level=campaign&fields=${demographicFields}&time_range=${timeRange}&breakdowns=gender&time_increment=1&access_token=${accessToken}`;
+
+        const [ageRes, genderRes] = await Promise.all([
+          fetch(ageUrl),
+          fetch(genderUrl)
+        ]);
+
+        if (ageRes.ok) {
+          const { data } = await ageRes.json();
+          if (data) {
+            for (const item of data) {
+              breakdowns.push({
+                campaign_id: campaign.id,
+                date: item.date_start,
+                breakdown_type: 'age',
+                breakdown_value: item.age || 'unknown',
+                impressions: parseInt(item.impressions) || 0,
+                clicks: parseInt(item.clicks) || 0,
+                spend: parseFloat(item.spend) || 0,
+                conversions: parseInt(item.conversions) || 0,
+              });
+            }
+          }
+        }
+
+        if (genderRes.ok) {
+          const { data } = await genderRes.json();
+          if (data) {
+            for (const item of data) {
+              breakdowns.push({
+                campaign_id: campaign.id,
+                date: item.date_start,
+                breakdown_type: 'gender',
+                breakdown_value: item.gender || 'unknown',
+                impressions: parseInt(item.impressions) || 0,
+                clicks: parseInt(item.clicks) || 0,
+                spend: parseFloat(item.spend) || 0,
+                conversions: parseInt(item.conversions) || 0,
+              });
+            }
+          }
+        }
+
       } catch (error) {
         console.error(`[${logId}] Erro ao sincronizar métricas da campanha ${campaign.id}:`, error);
         campaignErrors++;
       }
 
-      return { metrics: campaignMetrics, errors: campaignErrors };
+      return { metrics: campaignMetrics, breakdowns, errors: campaignErrors };
     };
 
-    // Processar 5 campanhas em paralelo (reduzido para evitar rate limit com 3 requests por campanha)
-    const results = await processInChunks(campaigns, 5, processCampaign);
+    // Processar 3 campanhas em paralelo (reduzido para evitar rate limit com múltiplos requests por campanha)
+    const results = await processInChunks(campaigns, 3, processCampaign);
 
-    // Coletar todas as métricas
+    // Coletar todas as métricas e breakdowns
     const allMetrics: any[] = [];
+    const allBreakdowns: any[] = [];
     for (const result of results) {
       allMetrics.push(...result.metrics);
+      allBreakdowns.push(...result.breakdowns);
       errors += result.errors;
     }
+
+    console.log(`[${logId}] Total de ${allMetrics.length} métricas e ${allBreakdowns.length} breakdowns coletados, inserindo em lotes...`);
 
     console.log(`[${logId}] Total de ${allMetrics.length} métricas coletadas, inserindo em lotes...`);
 
@@ -506,9 +582,28 @@ serve(async (req) => {
           .gte('date', dateStr);
       }
 
-      // Inserir novas
+      // Inserir novas métricas
       await batchUpsert(supabaseClient, 'metrics', allMetrics, ''); // Sem onConflict, pois acabamos de deletar
       metricsSynced = allMetrics.length;
+    }
+
+    // Processar breakdowns demográficos
+    if (allBreakdowns.length > 0) {
+      const uniqueCampaignIds = [...new Set(allBreakdowns.map(b => b.campaign_id))];
+      
+      // Deletar breakdowns antigos do período
+      for (let i = 0; i < uniqueCampaignIds.length; i += 50) {
+        const batchIds = uniqueCampaignIds.slice(i, i + 50);
+        await supabaseClient
+          .from('metric_breakdowns')
+          .delete()
+          .in('campaign_id', batchIds)
+          .gte('date', dateStr);
+      }
+
+      // Inserir novos breakdowns
+      await batchUpsert(supabaseClient, 'metric_breakdowns', allBreakdowns, '');
+      console.log(`[${logId}] ${allBreakdowns.length} breakdowns demográficos sincronizados`);
     }
 
     await supabaseClient.from('sync_logs').update({
