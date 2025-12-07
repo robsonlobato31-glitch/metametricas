@@ -105,6 +105,121 @@ export type Database = {
           },
         ]
       }
+      ad_sets: {
+        Row: {
+          ad_set_id: string
+          bid_amount: number | null
+          billing_event: string | null
+          campaign_id: string
+          created_at: string
+          daily_budget: number | null
+          end_date: string | null
+          id: string
+          lifetime_budget: number | null
+          name: string
+          optimization_goal: string | null
+          start_date: string | null
+          status: string
+          targeting: Json | null
+          updated_at: string
+        }
+        Insert: {
+          ad_set_id: string
+          bid_amount?: number | null
+          billing_event?: string | null
+          campaign_id: string
+          created_at?: string
+          daily_budget?: number | null
+          end_date?: string | null
+          id?: string
+          lifetime_budget?: number | null
+          name: string
+          optimization_goal?: string | null
+          start_date?: string | null
+          status: string
+          targeting?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          ad_set_id?: string
+          bid_amount?: number | null
+          billing_event?: string | null
+          campaign_id?: string
+          created_at?: string
+          daily_budget?: number | null
+          end_date?: string | null
+          id?: string
+          lifetime_budget?: number | null
+          name?: string
+          optimization_goal?: string | null
+          start_date?: string | null
+          status?: string
+          targeting?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_sets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ads: {
+        Row: {
+          ad_format: string | null
+          ad_id: string
+          ad_set_id: string
+          created_at: string
+          creative_id: string | null
+          creative_name: string | null
+          creative_type: string | null
+          creative_url: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ad_format?: string | null
+          ad_id: string
+          ad_set_id: string
+          created_at?: string
+          creative_id?: string | null
+          creative_name?: string | null
+          creative_type?: string | null
+          creative_url?: string | null
+          id?: string
+          name: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          ad_format?: string | null
+          ad_id?: string
+          ad_set_id?: string
+          created_at?: string
+          creative_id?: string | null
+          creative_name?: string | null
+          creative_type?: string | null
+          creative_url?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_ad_set_id_fkey"
+            columns: ["ad_set_id"]
+            isOneToOne: false
+            referencedRelation: "ad_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_alerts: {
         Row: {
           alert_type: string
@@ -344,6 +459,8 @@ export type Database = {
       }
       metrics: {
         Row: {
+          ad_id: string | null
+          ad_set_id: string | null
           average_position: number | null
           campaign_id: string
           clicks: number | null
@@ -374,6 +491,8 @@ export type Database = {
           video_views_75: number | null
         }
         Insert: {
+          ad_id?: string | null
+          ad_set_id?: string | null
           average_position?: number | null
           campaign_id: string
           clicks?: number | null
@@ -404,6 +523,8 @@ export type Database = {
           video_views_75?: number | null
         }
         Update: {
+          ad_id?: string | null
+          ad_set_id?: string | null
           average_position?: number | null
           campaign_id?: string
           clicks?: number | null
@@ -434,6 +555,20 @@ export type Database = {
           video_views_75?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "metrics_ad_id_fkey"
+            columns: ["ad_id"]
+            isOneToOne: false
+            referencedRelation: "ads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_ad_set_id_fkey"
+            columns: ["ad_set_id"]
+            isOneToOne: false
+            referencedRelation: "ad_sets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "metrics_campaign_id_fkey"
             columns: ["campaign_id"]
@@ -1048,6 +1183,12 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_accounts_with_spend: {
+        Args: { p_user_id: string }
+        Returns: {
+          account_id: string
+        }[]
+      }
       get_all_users: {
         Args: never
         Returns: {
@@ -1069,6 +1210,40 @@ export type Database = {
           total_spend: number
         }[]
       }
+      get_daily_metrics:
+        | {
+            Args: {
+              p_account_id?: string
+              p_date_from: string
+              p_date_to: string
+              p_user_id: string
+            }
+            Returns: {
+              clicks: number
+              conversions: number
+              date: string
+              impressions: number
+              revenue: number
+              spend: number
+            }[]
+          }
+        | {
+            Args: {
+              p_account_id?: string
+              p_date_from: string
+              p_date_to: string
+              p_status?: string
+              p_user_id: string
+            }
+            Returns: {
+              clicks: number
+              conversions: number
+              date: string
+              impressions: number
+              revenue: number
+              spend: number
+            }[]
+          }
       get_detailed_metrics: {
         Args: { p_date_from: string; p_date_to: string; p_user_id: string }
         Returns: {

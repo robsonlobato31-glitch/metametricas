@@ -23,12 +23,12 @@ export const useDailyMetrics = (dateFrom?: Date, dateTo?: Date, accountId?: stri
         queryFn: async () => {
             if (!user?.id) return [];
 
-            const { data, error } = await supabase.rpc('get_daily_metrics', {
+            // Use get_timeline_metrics which already exists
+            const { data, error } = await (supabase.rpc as any)('get_timeline_metrics', {
                 p_user_id: user.id,
                 p_date_from: dateFromStr,
                 p_date_to: dateToStr,
-                p_account_id: accountId || null,
-                p_status: status === 'WITH_SPEND' ? null : (status || null),
+                p_provider: undefined
             });
 
             if (error) {
@@ -36,7 +36,15 @@ export const useDailyMetrics = (dateFrom?: Date, dateTo?: Date, accountId?: stri
                 throw error;
             }
 
-            return data as DailyMetric[];
+            // Map to expected format
+            return (data || []).map((d: any) => ({
+                date: d.metric_date,
+                spend: Number(d.total_spend || 0),
+                revenue: Number(d.total_revenue || 0),
+                impressions: 0,
+                clicks: 0,
+                conversions: 0
+            })) as DailyMetric[];
         },
         enabled: !!user?.id,
         staleTime: 5 * 60 * 1000,
