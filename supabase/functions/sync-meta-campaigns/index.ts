@@ -7,22 +7,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper para processar em chunks
+// Helper para processar em chunks com delay
 async function processInChunks<T, R>(
   items: T[],
   chunkSize: number,
-  processor: (item: T) => Promise<R>
+  processor: (item: T) => Promise<R>,
+  delayMs = 100
 ): Promise<R[]> {
   const results: R[] = [];
   for (let i = 0; i < items.length; i += chunkSize) {
     const chunk = items.slice(i, i + chunkSize);
     const chunkResults = await Promise.all(chunk.map(processor));
     results.push(...chunkResults);
+    
+    if (i + chunkSize < items.length && delayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
   }
   return results;
 }
 
-// Helper para batch upsert
+// Helper para batch upsert com tratamento de erros
 async function batchUpsert(
   supabaseClient: any,
   table: string,
@@ -30,10 +35,21 @@ async function batchUpsert(
   onConflict: string,
   batchSize = 100
 ) {
+  let insertedCount = 0;
   for (let i = 0; i < data.length; i += batchSize) {
     const batch = data.slice(i, i + batchSize);
-    await supabaseClient.from(table).upsert(batch, { onConflict });
+    const { error, data: result } = await supabaseClient
+      .from(table)
+      .upsert(batch, { onConflict, ignoreDuplicates: false })
+      .select('id');
+    
+    if (error) {
+      console.error(`Erro no batch upsert para tabela ${table}:`, error);
+    } else {
+      insertedCount += result?.length || batch.length;
+    }
   }
+  return insertedCount;
 }
 
 serve(async (req) => {
@@ -91,7 +107,7 @@ serve(async (req) => {
 
     // Buscar TODAS as ad accounts do usuário com paginação
     let allAdAccounts: any[] = [];
-    let nextUrl: string | null = `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,currency,account_status&limit=1000&access_token=${accessToken}`;
+    let nextUrl: string | null = `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,currency,account_status&limit=100&access_token=${accessToken}`;
 
     while (nextUrl) {
       console.log(`[${logId}] Buscando contas Meta Ads...`);
@@ -126,13 +142,13 @@ serve(async (req) => {
     let adSetsSynced = 0;
     let adsSynced = 0;
 
-    // Processar contas em paralelo (3 por vez para evitar sobrecarga)
+    // Processar contas em paralelo (2 por vez para evitar rate limit)
     const processAccount = async (account: any) => {
       try {
         const accountId = account.id.replace('act_', '');
 
-        // Upsert conta
-        const { data: dbAccount } = await supabaseClient
+        // Upsert conta usando constraint (integration_id, account_id)
+        const { data: dbAccount, error: accountError } = await supabaseClient
           .from('ad_accounts')
           .upsert({
             integration_id: integration.id,
@@ -147,13 +163,16 @@ serve(async (req) => {
           .select()
           .single();
 
-        if (!dbAccount) return { accountsSynced: 0, campaignsSynced: 0, adSetsSynced: 0, adsSynced: 0 };
+        if (accountError || !dbAccount) {
+          console.error(`[${logId}] Erro ao upsert conta ${account.id}:`, accountError);
+          return { accountsSynced: 0, campaignsSynced: 0, adSetsSynced: 0, adsSynced: 0 };
+        }
 
-        // Buscar TODAS as campanhas da conta com paginação
+        // Buscar campanhas da conta com paginação
         let allCampaigns: any[] = [];
         let campaignsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/campaigns?` +
           `fields=id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time&` +
-          `limit=1000&access_token=${accessToken}`;
+          `limit=500&access_token=${accessToken}`;
 
         while (campaignsNextUrl) {
           const campaignsResponse: any = await fetch(campaignsNextUrl);
@@ -169,7 +188,7 @@ serve(async (req) => {
 
         console.log(`[${logId}] Encontradas ${allCampaigns.length} campanhas para conta ${account.name}`);
 
-        // Preparar campanhas para batch upsert
+        // Preparar campanhas para batch upsert usando constraint (ad_account_id, campaign_id)
         const campaignsBatch = allCampaigns.map(campaign => ({
           ad_account_id: dbAccount.id,
           campaign_id: campaign.id,
@@ -180,9 +199,10 @@ serve(async (req) => {
           lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : null,
           start_date: campaign.start_time ? new Date(campaign.start_time).toISOString().split('T')[0] : null,
           end_date: campaign.stop_time ? new Date(campaign.stop_time).toISOString().split('T')[0] : null,
+          sync_enabled: true, // Reativar sync para campanhas existentes
         }));
 
-        // Batch upsert de campanhas (100 por vez)
+        // Batch upsert de campanhas
         if (campaignsBatch.length > 0) {
           await batchUpsert(supabaseClient, 'campaigns', campaignsBatch, 'ad_account_id,campaign_id');
         }
@@ -198,8 +218,8 @@ serve(async (req) => {
         let accountAdSets = 0;
         let accountAds = 0;
 
-        // Para cada campanha, buscar ad sets e ads
-        for (const campaign of allCampaigns.slice(0, 10)) { // Limitar a 10 campanhas por conta para evitar timeout
+        // Para cada campanha, buscar ad sets e ads (limitar a 20 campanhas por conta)
+        for (const campaign of allCampaigns.slice(0, 20)) {
           try {
             const dbCampaignId = campaignIdMap.get(campaign.id);
             if (!dbCampaignId) continue;
@@ -208,7 +228,7 @@ serve(async (req) => {
             let allAdSets: any[] = [];
             let adSetsNextUrl: string | null = `https://graph.facebook.com/v18.0/${campaign.id}/adsets?` +
               `fields=id,name,status,optimization_goal,billing_event,bid_amount,daily_budget,lifetime_budget,start_time,end_time,targeting&` +
-              `limit=500&access_token=${accessToken}`;
+              `limit=100&access_token=${accessToken}`;
 
             while (adSetsNextUrl) {
               const adSetsResponse: any = await fetch(adSetsNextUrl);
@@ -252,8 +272,8 @@ serve(async (req) => {
 
             const adSetIdMap = new Map(dbAdSets?.map(as => [as.ad_set_id, as.id]) || []);
 
-            // Para cada ad set, buscar ads (limitar a 5 ad sets por campanha)
-            for (const adSet of allAdSets.slice(0, 5)) {
+            // Para cada ad set, buscar ads (limitar a 10 ad sets por campanha)
+            for (const adSet of allAdSets.slice(0, 10)) {
               try {
                 const dbAdSetId = adSetIdMap.get(adSet.id);
                 if (!dbAdSetId) continue;
@@ -262,7 +282,7 @@ serve(async (req) => {
                 let allAds: any[] = [];
                 let adsNextUrl: string | null = `https://graph.facebook.com/v18.0/${adSet.id}/ads?` +
                   `fields=id,name,status,creative{id,name,object_type,url_tags}&` +
-                  `limit=500&access_token=${accessToken}`;
+                  `limit=100&access_token=${accessToken}`;
 
                 while (adsNextUrl) {
                   const adsResponse: any = await fetch(adsNextUrl);
@@ -317,8 +337,8 @@ serve(async (req) => {
       }
     };
 
-    // Processar 3 contas em paralelo (reduzido para evitar rate limits)
-    const results = await processInChunks(allAdAccounts, 3, processAccount);
+    // Processar 2 contas em paralelo (reduzido para evitar rate limits)
+    const results = await processInChunks(allAdAccounts, 2, processAccount, 200);
 
     for (const result of results) {
       accountsSynced += result.accountsSynced;
