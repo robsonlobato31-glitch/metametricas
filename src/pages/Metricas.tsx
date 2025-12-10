@@ -95,28 +95,41 @@ export default function Metricas() {
   // Video Funnel Data
   const videoMetrics = useMemo(() => {
     const impressions = totals.impressions || 1; // Avoid division by zero
+    const hasVideoData = totals.video_views_25 > 0 || totals.video_views_50 > 0 || 
+                         totals.video_views_75 > 0 || totals.video_views_100 > 0;
+    
     return [
       {
         label: 'VV 100%',
         percentage: (totals.video_views_100 / impressions) * 100,
-        value: `${((totals.video_views_100 / impressions) * 100).toFixed(2)}%`
+        value: `${((totals.video_views_100 / impressions) * 100).toFixed(2)}%`,
+        hasData: hasVideoData
       },
       {
         label: 'VV 75%',
         percentage: (totals.video_views_75 / impressions) * 100,
-        value: `${((totals.video_views_75 / impressions) * 100).toFixed(2)}%`
+        value: `${((totals.video_views_75 / impressions) * 100).toFixed(2)}%`,
+        hasData: hasVideoData
       },
       {
         label: 'VV 50%',
         percentage: (totals.video_views_50 / impressions) * 100,
-        value: `${((totals.video_views_50 / impressions) * 100).toFixed(2)}%`
+        value: `${((totals.video_views_50 / impressions) * 100).toFixed(2)}%`,
+        hasData: hasVideoData
       },
       {
         label: 'VV 25%',
         percentage: (totals.video_views_25 / impressions) * 100,
-        value: `${((totals.video_views_25 / impressions) * 100).toFixed(2)}%`
+        value: `${((totals.video_views_25 / impressions) * 100).toFixed(2)}%`,
+        hasData: hasVideoData
       },
     ];
+  }, [totals]);
+
+  // Check if we have video data
+  const hasVideoData = useMemo(() => {
+    return totals.video_views_25 > 0 || totals.video_views_50 > 0 || 
+           totals.video_views_75 > 0 || totals.video_views_100 > 0;
   }, [totals]);
 
   // Fetch Demographics
@@ -359,7 +372,7 @@ export default function Metricas() {
             {/* Right Column */}
             <div className="col-span-12 md:col-span-6 xl:col-span-4 flex flex-col gap-6">
               <DemographicsChart data={demographicChartData} />
-              <VideoFunnel metrics={videoMetrics} />
+              {hasVideoData && <VideoFunnel metrics={videoMetrics} />}
               <CreativeTable creatives={creativeTableData} />
             </div>
           </div>
