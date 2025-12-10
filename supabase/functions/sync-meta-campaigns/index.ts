@@ -35,6 +35,9 @@ async function batchUpsert(
 // Helper para delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Tempo máximo de execução (50 segundos para ter margem)
+const MAX_EXECUTION_TIME = 50000;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -42,6 +45,7 @@ serve(async (req) => {
 
   const logId = crypto.randomUUID();
   const startedAt = new Date();
+  const startTime = Date.now();
 
   try {
     const authHeader = req.headers.get('Authorization')!;
@@ -118,6 +122,12 @@ serve(async (req) => {
     let adsSynced = 0;
 
     for (const account of allAdAccounts) {
+      // Verificar tempo de execução
+      if (Date.now() - startTime > MAX_EXECUTION_TIME) {
+        console.warn(`[${logId}] Tempo máximo atingido, salvando progresso parcial`);
+        break;
+      }
+
       try {
         const accountId = account.id.replace('act_', '');
 
@@ -153,6 +163,8 @@ serve(async (req) => {
             allCampaigns = [...allCampaigns, ...campaignsData.data];
             campaignsNextUrl = campaignsData.paging?.next || null;
           } else {
+            const errorText = await campaignsResponse.text();
+            console.error(`[${logId}] Erro ao buscar campanhas da conta ${account.id}:`, errorText.substring(0, 200));
             campaignsNextUrl = null;
           }
         }
@@ -186,10 +198,14 @@ serve(async (req) => {
 
         const campaignIdMap = new Map(dbCampaigns?.map(c => [c.campaign_id, c.id]) || []);
 
-        // Processar ad sets e ads para cada campanha (limitado para evitar timeout)
-        const campaignsToProcess = allCampaigns.slice(0, 30);
-        
-        for (const campaign of campaignsToProcess) {
+        // Processar TODAS as campanhas (removido limite artificial)
+        for (const campaign of allCampaigns) {
+          // Verificar tempo de execução
+          if (Date.now() - startTime > MAX_EXECUTION_TIME) {
+            console.warn(`[${logId}] Tempo máximo atingido durante processamento de ad sets`);
+            break;
+          }
+
           try {
             const dbCampaignId = campaignIdMap.get(campaign.id);
             if (!dbCampaignId) continue;
@@ -198,7 +214,11 @@ serve(async (req) => {
             const adSetsUrl = `https://graph.facebook.com/v18.0/${campaign.id}/adsets?fields=id,name,status,optimization_goal,billing_event,bid_amount,daily_budget,lifetime_budget,start_time,end_time,targeting&limit=100&access_token=${accessToken}`;
             const adSetsResponse = await fetch(adSetsUrl);
 
-            if (!adSetsResponse.ok) continue;
+            if (!adSetsResponse.ok) {
+              const errorText = await adSetsResponse.text();
+              console.error(`[${logId}] Erro ao buscar ad sets da campanha ${campaign.id}:`, errorText.substring(0, 150));
+              continue;
+            }
 
             const adSetsData = await adSetsResponse.json();
             const allAdSets = adSetsData.data || [];
@@ -231,8 +251,14 @@ serve(async (req) => {
 
             const adSetIdMap = new Map(dbAdSets?.map(as => [as.ad_set_id, as.id]) || []);
 
-            // Buscar ads para cada ad set
-            for (const adSet of allAdSets.slice(0, 15)) {
+            // Buscar ads para TODOS os ad sets (removido limite artificial)
+            for (const adSet of allAdSets) {
+              // Verificar tempo de execução
+              if (Date.now() - startTime > MAX_EXECUTION_TIME) {
+                console.warn(`[${logId}] Tempo máximo atingido durante processamento de ads`);
+                break;
+              }
+
               try {
                 const dbAdSetId = adSetIdMap.get(adSet.id);
                 if (!dbAdSetId) continue;
@@ -241,7 +267,11 @@ serve(async (req) => {
                 const adsUrl = `https://graph.facebook.com/v18.0/${adSet.id}/ads?fields=id,name,status,creative{id,name,object_type,thumbnail_url,effective_object_story_id}&limit=50&access_token=${accessToken}`;
                 const adsResponse = await fetch(adsUrl);
 
-                if (!adsResponse.ok) continue;
+                if (!adsResponse.ok) {
+                  const errorText = await adsResponse.text();
+                  console.error(`[${logId}] Erro ao buscar ads do ad set ${adSet.id}:`, errorText.substring(0, 150));
+                  continue;
+                }
 
                 const adsData = await adsResponse.json();
                 const allAds = adsData.data || [];
@@ -265,6 +295,9 @@ serve(async (req) => {
               } catch (error) {
                 console.error(`[${logId}] Erro ao sincronizar ads do ad set ${adSet.id}:`, error);
               }
+
+              // Delay entre ad sets para evitar rate limit
+              await delay(50);
             }
 
             // Delay entre campanhas para evitar rate limit
@@ -275,7 +308,7 @@ serve(async (req) => {
         }
 
         // Delay entre contas
-        await delay(200);
+        await delay(150);
       } catch (error) {
         console.error(`[${logId}] Erro ao sincronizar conta ${account.id}:`, error);
       }

@@ -27,49 +27,66 @@ export const useDemographics = (
         queryFn: async () => {
             if (!user?.id) return { age: [], gender: [] };
 
-            // We need to join with campaigns to filter by status and account
-            let query = supabase
-                .from('metric_breakdowns')
+            // Primeiro, buscar as campanhas do usuário com os filtros aplicados
+            let campaignsQuery = supabase
+                .from('campaigns')
                 .select(`
-          breakdown_type,
-          breakdown_value,
-          impressions,
-          clicks,
-          spend,
-          conversions,
-          campaigns!inner(
-            id,
-            status,
-            ad_account_id,
-            ad_accounts!inner(
-              integration_id,
-              integrations!inner(
-                user_id
-              )
-            )
-          )
-        `)
-                .eq('campaigns.ad_accounts.integrations.user_id', user.id)
+                    id,
+                    status,
+                    ad_account_id,
+                    ad_accounts!inner(
+                        id,
+                        integration_id,
+                        integrations!inner(
+                            user_id
+                        )
+                    )
+                `)
+                .eq('ad_accounts.integrations.user_id', user.id);
+
+            if (accountId) {
+                campaignsQuery = campaignsQuery.eq('ad_account_id', accountId);
+            }
+
+            if (status && status !== 'WITH_SPEND') {
+                campaignsQuery = campaignsQuery.eq('status', status);
+            }
+
+            const { data: campaigns, error: campaignsError } = await campaignsQuery;
+
+            if (campaignsError) {
+                console.error('Error fetching campaigns for demographics:', campaignsError);
+                throw campaignsError;
+            }
+
+            if (!campaigns || campaigns.length === 0) {
+                return { age: [], gender: [] };
+            }
+
+            const campaignIds = campaigns.map(c => c.id);
+
+            // Agora buscar os breakdowns para essas campanhas
+            let breakdownsQuery = supabase
+                .from('metric_breakdowns')
+                .select('breakdown_type, breakdown_value, impressions, clicks, spend, conversions')
+                .in('campaign_id', campaignIds)
                 .gte('date', dateFromStr)
                 .lte('date', dateToStr);
 
-            if (accountId) {
-                query = query.eq('campaigns.ad_account_id', accountId);
+            // Se status é WITH_SPEND, filtrar por spend > 0
+            if (status === 'WITH_SPEND') {
+                breakdownsQuery = breakdownsQuery.gt('spend', 0);
             }
 
-            if (status) {
-                if (status === 'WITH_SPEND') {
-                    query = query.gt('spend', 0);
-                } else {
-                    query = query.eq('campaigns.status', status);
-                }
-            }
-
-            const { data, error } = await query;
+            const { data, error } = await breakdownsQuery;
 
             if (error) {
                 console.error('Error fetching demographics:', error);
                 throw error;
+            }
+
+            if (!data || data.length === 0) {
+                return { age: [], gender: [] };
             }
 
             // Aggregate data by type and value

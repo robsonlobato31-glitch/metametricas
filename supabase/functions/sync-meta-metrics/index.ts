@@ -7,8 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Limite reduzido para evitar timeout
-const MAX_CAMPAIGNS_PER_SYNC = 20;
+// Aumentado para processar mais campanhas
+const MAX_CAMPAIGNS_PER_SYNC = 50;
 
 // Helper para delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -85,17 +85,20 @@ serve(async (req) => {
 
     const accessToken = await getValidAccessToken(supabaseClient, integration.id);
 
-    // Buscar campanhas ativas com sync_enabled
+    // Buscar campanhas ativas com sync_enabled, PRIORIZANDO por conta e status
     const { data: campaigns, error: campaignsError } = await supabaseClient
       .from('campaigns')
       .select(`
         id,
         campaign_id,
         name,
-        ad_accounts!inner(integration_id)
+        status,
+        ad_account_id,
+        ad_accounts!inner(integration_id, account_name)
       `)
       .eq('ad_accounts.integration_id', integration.id)
       .eq('sync_enabled', true)
+      .order('status', { ascending: true }) // ACTIVE primeiro
       .limit(MAX_CAMPAIGNS_PER_SYNC);
 
     if (campaignsError) {
@@ -247,7 +250,7 @@ serve(async (req) => {
           }
 
           // Buscar breakdowns demográficos
-          const demographicFields = 'date_start,impressions,clicks,spend,conversions';
+          const demographicFields = 'date_start,impressions,clicks,spend,actions';
           
           // Age breakdown
           try {
@@ -257,6 +260,17 @@ serve(async (req) => {
               const { data: ageData } = await ageRes.json();
               if (ageData) {
                 for (const item of ageData) {
+                  // Extrair conversões das actions
+                  let conversions = 0;
+                  if (item.actions && Array.isArray(item.actions)) {
+                    for (const action of item.actions) {
+                      const type = action.action_type;
+                      if (type.includes('purchase') || type.includes('conversion') || type.includes('lead')) {
+                        conversions += parseInt(action.value || '0');
+                      }
+                    }
+                  }
+                  
                   allBreakdowns.push({
                     campaign_id: campaign.id,
                     date: item.date_start,
@@ -265,6 +279,7 @@ serve(async (req) => {
                     impressions: parseInt(item.impressions) || 0,
                     clicks: parseInt(item.clicks) || 0,
                     spend: parseFloat(item.spend) || 0,
+                    conversions: conversions,
                   });
                 }
               }
@@ -281,6 +296,17 @@ serve(async (req) => {
               const { data: genderData } = await genderRes.json();
               if (genderData) {
                 for (const item of genderData) {
+                  // Extrair conversões das actions
+                  let conversions = 0;
+                  if (item.actions && Array.isArray(item.actions)) {
+                    for (const action of item.actions) {
+                      const type = action.action_type;
+                      if (type.includes('purchase') || type.includes('conversion') || type.includes('lead')) {
+                        conversions += parseInt(action.value || '0');
+                      }
+                    }
+                  }
+                  
                   allBreakdowns.push({
                     campaign_id: campaign.id,
                     date: item.date_start,
@@ -289,6 +315,7 @@ serve(async (req) => {
                     impressions: parseInt(item.impressions) || 0,
                     clicks: parseInt(item.clicks) || 0,
                     spend: parseFloat(item.spend) || 0,
+                    conversions: conversions,
                   });
                 }
               }
@@ -299,7 +326,7 @@ serve(async (req) => {
         }
 
         // Delay entre campanhas
-        await delay(150);
+        await delay(100);
       } catch (error) {
         console.error(`[${logId}] Erro ao processar campanha ${campaign.campaign_id}:`, error);
         errors++;
