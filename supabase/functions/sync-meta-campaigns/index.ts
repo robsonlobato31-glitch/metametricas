@@ -38,6 +38,9 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // Tempo máximo de execução (50 segundos para ter margem)
 const MAX_EXECUTION_TIME = 50000;
 
+// Limite de campanhas para processar ads por execução
+const MAX_CAMPAIGNS_FOR_ADS = 50;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -198,8 +201,16 @@ serve(async (req) => {
 
         const campaignIdMap = new Map(dbCampaigns?.map(c => [c.campaign_id, c.id]) || []);
 
-        // Processar TODAS as campanhas (removido limite artificial)
-        for (const campaign of allCampaigns) {
+        // PRIORIZAR campanhas ACTIVE para sincronização de ads
+        const activeCampaigns = allCampaigns.filter(c => c.status === 'ACTIVE');
+        const inactiveCampaigns = allCampaigns.filter(c => c.status !== 'ACTIVE');
+        const sortedCampaigns = [...activeCampaigns, ...inactiveCampaigns];
+        
+        // Limitar o número de campanhas para processar ads
+        const campaignsForAds = sortedCampaigns.slice(0, MAX_CAMPAIGNS_FOR_ADS);
+        console.log(`[${logId}] Processando ads para ${campaignsForAds.length} campanhas (${activeCampaigns.length} ativas)`);
+
+        for (const campaign of campaignsForAds) {
           // Verificar tempo de execução
           if (Date.now() - startTime > MAX_EXECUTION_TIME) {
             console.warn(`[${logId}] Tempo máximo atingido durante processamento de ad sets`);
@@ -251,7 +262,7 @@ serve(async (req) => {
 
             const adSetIdMap = new Map(dbAdSets?.map(as => [as.ad_set_id, as.id]) || []);
 
-            // Buscar ads para TODOS os ad sets (removido limite artificial)
+            // Buscar ads para os ad sets
             for (const adSet of allAdSets) {
               // Verificar tempo de execução
               if (Date.now() - startTime > MAX_EXECUTION_TIME) {
@@ -297,18 +308,18 @@ serve(async (req) => {
               }
 
               // Delay entre ad sets para evitar rate limit
-              await delay(50);
+              await delay(30);
             }
 
             // Delay entre campanhas para evitar rate limit
-            await delay(100);
+            await delay(50);
           } catch (error) {
             console.error(`[${logId}] Erro ao sincronizar ad sets da campanha ${campaign.id}:`, error);
           }
         }
 
         // Delay entre contas
-        await delay(150);
+        await delay(100);
       } catch (error) {
         console.error(`[${logId}] Erro ao sincronizar conta ${account.id}:`, error);
       }

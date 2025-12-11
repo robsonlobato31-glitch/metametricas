@@ -163,18 +163,22 @@ export default function Metricas() {
 
   // Map creatives for table
   const creativeTableData = useMemo(() => {
-    if (!topCreatives) return [];
-    return topCreatives.map(c => ({
+    if (!topCreatives?.creatives) return [];
+    return topCreatives.creatives.map(c => ({
       id: c.ad_id,
       name: c.ad_name,
-      budget: 0, // Budget not available at ad level in this context
+      budget: 0,
       messages: c.messages || 0,
       cost_per_message: c.cost_per_message || 0,
       spend: c.spend || 0,
       ctr: c.ctr || 0,
-      cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0
+      cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0,
+      creative_url: c.creative_url
     }));
   }, [topCreatives]);
+
+  // Check if creatives need sync
+  const creativesNeedSync = topCreatives?.needsSync ?? false;
 
   const isLoading = dailyLoading || campaignsLoading || demographicsLoading || creativesLoading;
   const anyError = campaignsError;
@@ -373,7 +377,10 @@ export default function Metricas() {
             <div className="col-span-12 md:col-span-6 xl:col-span-4 flex flex-col gap-6">
               <DemographicsChart data={demographicChartData} />
               {hasVideoData && <VideoFunnel metrics={videoMetrics} />}
-              <CreativeTable creatives={creativeTableData} />
+              <CreativeTable 
+                creatives={creativeTableData} 
+                needsSync={creativesNeedSync}
+              />
             </div>
           </div>
 
