@@ -35,11 +35,8 @@ async function batchUpsert(
 // Helper para delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Tempo máximo de execução (50 segundos para ter margem)
-const MAX_EXECUTION_TIME = 50000;
-
-// Limite de campanhas para processar ads por execução
-const MAX_CAMPAIGNS_FOR_ADS = 50;
+// Tempo máximo de execução (55 segundos para ter margem)
+const MAX_EXECUTION_TIME = 55000;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -155,7 +152,7 @@ serve(async (req) => {
 
         accountsSynced++;
 
-        // Buscar campanhas
+        // ===== BUSCAR CAMPANHAS =====
         let allCampaigns: any[] = [];
         let campaignsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time&limit=200&access_token=${accessToken}`;
 
@@ -201,124 +198,100 @@ serve(async (req) => {
 
         const campaignIdMap = new Map(dbCampaigns?.map(c => [c.campaign_id, c.id]) || []);
 
-        // PRIORIZAR campanhas ACTIVE para sincronização de ads
-        const activeCampaigns = allCampaigns.filter(c => c.status === 'ACTIVE');
-        const inactiveCampaigns = allCampaigns.filter(c => c.status !== 'ACTIVE');
-        const sortedCampaigns = [...activeCampaigns, ...inactiveCampaigns];
+        // ===== BUSCAR AD SETS DIRETAMENTE DA CONTA (OTIMIZADO) =====
+        console.log(`[${logId}] Buscando ad sets diretamente da conta ${account.name}...`);
         
-        // Limitar o número de campanhas para processar ads
-        const campaignsForAds = sortedCampaigns.slice(0, MAX_CAMPAIGNS_FOR_ADS);
-        console.log(`[${logId}] Processando ads para ${campaignsForAds.length} campanhas (${activeCampaigns.length} ativas)`);
+        let allAdSets: any[] = [];
+        let adSetsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/adsets?fields=id,name,status,campaign_id,optimization_goal,billing_event,bid_amount,daily_budget,lifetime_budget,start_time,end_time,targeting&limit=200&access_token=${accessToken}`;
 
-        for (const campaign of campaignsForAds) {
-          // Verificar tempo de execução
-          if (Date.now() - startTime > MAX_EXECUTION_TIME) {
-            console.warn(`[${logId}] Tempo máximo atingido durante processamento de ad sets`);
-            break;
-          }
-
-          try {
-            const dbCampaignId = campaignIdMap.get(campaign.id);
-            if (!dbCampaignId) continue;
-
-            // Buscar ad sets
-            const adSetsUrl = `https://graph.facebook.com/v18.0/${campaign.id}/adsets?fields=id,name,status,optimization_goal,billing_event,bid_amount,daily_budget,lifetime_budget,start_time,end_time,targeting&limit=100&access_token=${accessToken}`;
-            const adSetsResponse = await fetch(adSetsUrl);
-
-            if (!adSetsResponse.ok) {
-              const errorText = await adSetsResponse.text();
-              console.error(`[${logId}] Erro ao buscar ad sets da campanha ${campaign.id}:`, errorText.substring(0, 150));
-              continue;
-            }
-
-            const adSetsData = await adSetsResponse.json();
-            const allAdSets = adSetsData.data || [];
-
-            if (allAdSets.length > 0) {
-              const adSetsBatch = allAdSets.map((adSet: any) => ({
-                campaign_id: dbCampaignId,
-                ad_set_id: adSet.id,
-                name: adSet.name,
-                status: adSet.status,
-                optimization_goal: adSet.optimization_goal,
-                billing_event: adSet.billing_event,
-                bid_amount: adSet.bid_amount ? parseFloat(adSet.bid_amount) / 100 : null,
-                daily_budget: adSet.daily_budget ? parseFloat(adSet.daily_budget) / 100 : null,
-                lifetime_budget: adSet.lifetime_budget ? parseFloat(adSet.lifetime_budget) / 100 : null,
-                start_date: adSet.start_time ? new Date(adSet.start_time).toISOString().split('T')[0] : null,
-                end_date: adSet.end_time ? new Date(adSet.end_time).toISOString().split('T')[0] : null,
-                targeting: adSet.targeting || null,
-              }));
-
-              await batchUpsert(supabaseClient, 'ad_sets', adSetsBatch, 'campaign_id,ad_set_id');
-              adSetsSynced += allAdSets.length;
-            }
-
-            // Buscar ad sets do banco para obter IDs
-            const { data: dbAdSets } = await supabaseClient
-              .from('ad_sets')
-              .select('id, ad_set_id')
-              .eq('campaign_id', dbCampaignId);
-
-            const adSetIdMap = new Map(dbAdSets?.map(as => [as.ad_set_id, as.id]) || []);
-
-            // Buscar ads para os ad sets
-            for (const adSet of allAdSets) {
-              // Verificar tempo de execução
-              if (Date.now() - startTime > MAX_EXECUTION_TIME) {
-                console.warn(`[${logId}] Tempo máximo atingido durante processamento de ads`);
-                break;
-              }
-
-              try {
-                const dbAdSetId = adSetIdMap.get(adSet.id);
-                if (!dbAdSetId) continue;
-
-                // Buscar ads com creative thumbnail
-                const adsUrl = `https://graph.facebook.com/v18.0/${adSet.id}/ads?fields=id,name,status,creative{id,name,object_type,thumbnail_url,effective_object_story_id}&limit=50&access_token=${accessToken}`;
-                const adsResponse = await fetch(adsUrl);
-
-                if (!adsResponse.ok) {
-                  const errorText = await adsResponse.text();
-                  console.error(`[${logId}] Erro ao buscar ads do ad set ${adSet.id}:`, errorText.substring(0, 150));
-                  continue;
-                }
-
-                const adsData = await adsResponse.json();
-                const allAds = adsData.data || [];
-
-                if (allAds.length > 0) {
-                  const adsBatch = allAds.map((ad: any) => ({
-                    ad_set_id: dbAdSetId,
-                    ad_id: ad.id,
-                    name: ad.name,
-                    status: ad.status,
-                    creative_id: ad.creative?.id || null,
-                    creative_name: ad.creative?.name || null,
-                    creative_type: ad.creative?.object_type || null,
-                    creative_url: ad.creative?.thumbnail_url || null,
-                    ad_format: ad.creative?.object_type || null,
-                  }));
-
-                  await batchUpsert(supabaseClient, 'ads', adsBatch, 'ad_set_id,ad_id');
-                  adsSynced += allAds.length;
-                }
-              } catch (error) {
-                console.error(`[${logId}] Erro ao sincronizar ads do ad set ${adSet.id}:`, error);
-              }
-
-              // Delay entre ad sets para evitar rate limit
-              await delay(30);
-            }
-
-            // Delay entre campanhas para evitar rate limit
-            await delay(50);
-          } catch (error) {
-            console.error(`[${logId}] Erro ao sincronizar ad sets da campanha ${campaign.id}:`, error);
+        while (adSetsNextUrl && (Date.now() - startTime < MAX_EXECUTION_TIME)) {
+          const adSetsResponse: Response = await fetch(adSetsNextUrl);
+          if (adSetsResponse.ok) {
+            const adSetsData: any = await adSetsResponse.json();
+            allAdSets = [...allAdSets, ...adSetsData.data];
+            adSetsNextUrl = adSetsData.paging?.next || null;
+          } else {
+            const errorText = await adSetsResponse.text();
+            console.error(`[${logId}] Erro ao buscar ad sets:`, errorText.substring(0, 150));
+            adSetsNextUrl = null;
           }
         }
 
-        // Delay entre contas
+        console.log(`[${logId}] Conta ${account.name}: ${allAdSets.length} ad sets encontrados`);
+
+        // Batch upsert ad sets
+        if (allAdSets.length > 0) {
+          const adSetsBatch = allAdSets
+            .filter(adSet => campaignIdMap.has(adSet.campaign_id))
+            .map((adSet: any) => ({
+              campaign_id: campaignIdMap.get(adSet.campaign_id),
+              ad_set_id: adSet.id,
+              name: adSet.name,
+              status: adSet.status,
+              optimization_goal: adSet.optimization_goal,
+              billing_event: adSet.billing_event,
+              bid_amount: adSet.bid_amount ? parseFloat(adSet.bid_amount) / 100 : null,
+              daily_budget: adSet.daily_budget ? parseFloat(adSet.daily_budget) / 100 : null,
+              lifetime_budget: adSet.lifetime_budget ? parseFloat(adSet.lifetime_budget) / 100 : null,
+              start_date: adSet.start_time ? new Date(adSet.start_time).toISOString().split('T')[0] : null,
+              end_date: adSet.end_time ? new Date(adSet.end_time).toISOString().split('T')[0] : null,
+              targeting: adSet.targeting || null,
+            }));
+
+          const insertedAdSets = await batchUpsert(supabaseClient, 'ad_sets', adSetsBatch, 'campaign_id,ad_set_id');
+          adSetsSynced += insertedAdSets;
+        }
+
+        // Buscar ad sets do banco para obter IDs
+        const { data: dbAdSets } = await supabaseClient
+          .from('ad_sets')
+          .select('id, ad_set_id')
+          .in('campaign_id', Array.from(campaignIdMap.values()));
+
+        const adSetIdMap = new Map(dbAdSets?.map(as => [as.ad_set_id, as.id]) || []);
+
+        // ===== BUSCAR ADS DIRETAMENTE DA CONTA (OTIMIZADO) =====
+        console.log(`[${logId}] Buscando ads diretamente da conta ${account.name}...`);
+        
+        let allAds: any[] = [];
+        let adsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/ads?fields=id,name,status,adset_id,creative{id,name,object_type,thumbnail_url,effective_object_story_id}&limit=200&access_token=${accessToken}`;
+
+        while (adsNextUrl && (Date.now() - startTime < MAX_EXECUTION_TIME)) {
+          const adsResponse: Response = await fetch(adsNextUrl);
+          if (adsResponse.ok) {
+            const adsData: any = await adsResponse.json();
+            allAds = [...allAds, ...adsData.data];
+            adsNextUrl = adsData.paging?.next || null;
+          } else {
+            const errorText = await adsResponse.text();
+            console.error(`[${logId}] Erro ao buscar ads:`, errorText.substring(0, 150));
+            adsNextUrl = null;
+          }
+        }
+
+        console.log(`[${logId}] Conta ${account.name}: ${allAds.length} ads encontrados`);
+
+        // Batch upsert ads
+        if (allAds.length > 0) {
+          const adsBatch = allAds
+            .filter(ad => adSetIdMap.has(ad.adset_id))
+            .map((ad: any) => ({
+              ad_set_id: adSetIdMap.get(ad.adset_id),
+              ad_id: ad.id,
+              name: ad.name,
+              status: ad.status,
+              creative_id: ad.creative?.id || null,
+              creative_name: ad.creative?.name || null,
+              creative_type: ad.creative?.object_type || null,
+              creative_url: ad.creative?.thumbnail_url || null,
+              ad_format: ad.creative?.object_type || null,
+            }));
+
+          const insertedAds = await batchUpsert(supabaseClient, 'ads', adsBatch, 'ad_set_id,ad_id');
+          adsSynced += insertedAds;
+        }
+
+        // Delay entre contas para evitar rate limit
         await delay(100);
       } catch (error) {
         console.error(`[${logId}] Erro ao sincronizar conta ${account.id}:`, error);
@@ -332,7 +305,8 @@ serve(async (req) => {
       campaigns_synced: campaignsSynced,
     }).eq('id', logId);
 
-    console.log(`[${logId}] Sincronização concluída: ${accountsSynced} contas, ${campaignsSynced} campanhas, ${adSetsSynced} ad sets, ${adsSynced} ads`);
+    const executionTime = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`[${logId}] Sincronização concluída em ${executionTime}s: ${accountsSynced} contas, ${campaignsSynced} campanhas, ${adSetsSynced} ad sets, ${adsSynced} ads`);
 
     return new Response(
       JSON.stringify({
@@ -341,6 +315,7 @@ serve(async (req) => {
         campaignsSynced,
         adSetsSynced,
         adsSynced,
+        executionTime: `${executionTime}s`,
         message: `Campanhas Meta sincronizadas: ${campaignsSynced} campanhas, ${adSetsSynced} ad sets, ${adsSynced} ads`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
