@@ -125,6 +125,25 @@ serve(async (req) => {
 
     console.log(`[${logId}] Sincronizando métricas para ${campaigns.length} campanhas`);
 
+    // Mapear anúncios (ads) para vincular métricas de nível de anúncio
+    const campaignIds = campaigns.map((c: any) => c.id);
+
+    const { data: adSets } = await supabaseClient
+      .from('ad_sets')
+      .select('id, ad_set_id, campaign_id')
+      .in('campaign_id', campaignIds);
+
+    const adSetIds = (adSets || []).map((as: any) => as.id);
+
+    const { data: ads } = await supabaseClient
+      .from('ads')
+      .select('id, ad_id, ad_set_id')
+      .in('ad_set_id', adSetIds);
+
+    const adIdMap = new Map<string, string>(
+      (ads || []).map((ad: any) => [ad.ad_id as string, ad.id as string])
+    );
+
     const allMetrics: any[] = [];
     const allBreakdowns: any[] = [];
     const campaignsToDisable: string[] = [];
@@ -140,8 +159,8 @@ serve(async (req) => {
         const fields = 'date_start,impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr,cpc,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
         const timeRange = `{"since":"${since}","until":"${until}"}`;
 
-        // Buscar insights da campanha
-        const campaignUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=campaign&fields=${fields}&time_range=${timeRange}&time_increment=1&access_token=${accessToken}`;
+        // Buscar insights da campanha em nível de ANÚNCIO (ad)
+        const campaignUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=ad&fields=${fields}&time_range=${timeRange}&time_increment=1&access_token=${accessToken}`;
         const campaignRes = await fetch(campaignUrl);
 
         if (!campaignRes.ok) {
@@ -225,8 +244,12 @@ serve(async (req) => {
               videoViews100 = insight.video_p100_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
             }
 
+            const adIdFromInsight = (insight as any).ad_id as string | undefined;
+            const internalAdId = adIdFromInsight ? adIdMap.get(adIdFromInsight) || null : null;
+
             allMetrics.push({
               campaign_id: campaign.id,
+              ad_id: internalAdId,
               date: insight.date_start,
               impressions: parseInt(insight.impressions) || 0,
               clicks: parseInt(insight.clicks) || 0,
