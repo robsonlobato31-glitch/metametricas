@@ -29,7 +29,8 @@ export const useTopCreatives = (
     dateFrom?: Date,
     dateTo?: Date,
     accountId?: string,
-    status?: string
+    status?: string,
+    campaignId?: string
 ) => {
     const { user } = useAuth();
 
@@ -37,7 +38,7 @@ export const useTopCreatives = (
     const dateToStr = dateTo ? format(dateTo, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
 
     return useQuery({
-        queryKey: ['top-creatives', user?.id, dateFromStr, dateToStr, accountId, status],
+        queryKey: ['top-creatives', user?.id, dateFromStr, dateToStr, accountId, status, campaignId],
         queryFn: async (): Promise<TopCreativesResult> => {
             if (!user?.id) return { creatives: [], needsSync: true, hasAdsData: false };
 
@@ -73,6 +74,11 @@ export const useTopCreatives = (
 
             if (status && status !== 'WITH_SPEND') {
                 campaignsQuery = campaignsQuery.eq('status', status);
+            }
+
+            // Filter by campaign if specified
+            if (campaignId) {
+                campaignsQuery = campaignsQuery.eq('id', campaignId);
             }
 
             const { data: campaigns, error: campaignsError } = await campaignsQuery;
