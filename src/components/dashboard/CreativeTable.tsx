@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Image, AlertCircle, RefreshCw } from 'lucide-react';
+import { Image, AlertCircle, RefreshCw, Filter, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface CreativeData {
     id: string;
@@ -15,19 +17,52 @@ interface CreativeData {
     creative_url?: string | null;
 }
 
+interface AdAccount {
+    id: string;
+    account_name: string;
+}
+
+interface Campaign {
+    id: string;
+    name: string;
+}
+
 interface CreativeTableProps {
     creatives: CreativeData[];
     needsSync?: boolean;
     onSyncClick?: () => void;
     isSyncing?: boolean;
+    // Filter props
+    accounts?: AdAccount[];
+    campaigns?: Campaign[];
+    selectedAccountId?: string;
+    selectedCampaignId?: string;
+    selectedStatus?: string;
+    onAccountChange?: (value: string) => void;
+    onCampaignChange?: (value: string) => void;
+    onStatusChange?: (value: string) => void;
+    showFilters?: boolean;
 }
 
 export const CreativeTable: React.FC<CreativeTableProps> = ({ 
     creatives, 
     needsSync = false,
     onSyncClick,
-    isSyncing = false
+    isSyncing = false,
+    accounts = [],
+    campaigns = [],
+    selectedAccountId,
+    selectedCampaignId,
+    selectedStatus,
+    onAccountChange,
+    onCampaignChange,
+    onStatusChange,
+    showFilters = false
 }) => {
+    const [filtersOpen, setFiltersOpen] = useState(false);
+
+    const hasFilters = showFilters && (accounts.length > 0 || campaigns.length > 0);
+
     return (
         <div className="bg-card border border-border rounded-2xl p-6">
             <div className="flex justify-between items-center mb-4">
@@ -37,7 +72,72 @@ export const CreativeTable: React.FC<CreativeTableProps> = ({
                     </div>
                     <h2 className="font-bold text-foreground text-sm">Criativos Destaques</h2>
                 </div>
+                {hasFilters && (
+                    <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+                        <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                                <Filter size={12} />
+                                Filtros
+                                <ChevronDown size={12} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+                            </Button>
+                        </CollapsibleTrigger>
+                    </Collapsible>
+                )}
             </div>
+
+            {hasFilters && (
+                <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+                    <CollapsibleContent className="mb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-muted/50 rounded-lg">
+                            {accounts.length > 0 && onAccountChange && (
+                                <Select value={selectedAccountId || 'all'} onValueChange={onAccountChange}>
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="Conta" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todas as contas</SelectItem>
+                                        {accounts.map((account) => (
+                                            <SelectItem key={account.id} value={account.id}>
+                                                {account.account_name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                            
+                            {campaigns.length > 0 && onCampaignChange && (
+                                <Select value={selectedCampaignId || 'all'} onValueChange={onCampaignChange}>
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="Campanha" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todas as campanhas</SelectItem>
+                                        {campaigns.map((campaign) => (
+                                            <SelectItem key={campaign.id} value={campaign.id}>
+                                                {campaign.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                            
+                            {onStatusChange && (
+                                <Select value={selectedStatus || 'all'} onValueChange={onStatusChange}>
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todos os status</SelectItem>
+                                        <SelectItem value="ACTIVE">Ativo</SelectItem>
+                                        <SelectItem value="PAUSED">Pausado</SelectItem>
+                                        <SelectItem value="WITH_SPEND">Com gasto</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
+            )}
 
             {needsSync ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
