@@ -217,13 +217,19 @@ serve(async (req) => {
           }
         }
 
-        console.log(`[${logId}] Conta ${account.name}: ${allAdSets.length} ad sets encontrados`);
+        console.log(`[${logId}] Conta ${account.name}: ${allAdSets.length} ad sets encontrados da API`);
 
         // Batch upsert ad sets
         if (allAdSets.length > 0) {
-          const adSetsBatch = allAdSets
-            .filter(adSet => campaignIdMap.has(adSet.campaign_id))
-            .map((adSet: any) => ({
+          const filteredAdSets = allAdSets.filter(adSet => campaignIdMap.has(adSet.campaign_id));
+          console.log(`[${logId}] Ad sets filtrados: ${filteredAdSets.length}/${allAdSets.length} (match com campanhas)`);
+          
+          if (filteredAdSets.length === 0 && allAdSets.length > 0) {
+            console.warn(`[${logId}] AVISO: Nenhum ad set correspondeu. Campaign IDs no mapa: ${Array.from(campaignIdMap.keys()).slice(0, 3).join(', ')}`);
+            console.warn(`[${logId}] Ad set campaign_ids: ${allAdSets.slice(0, 3).map((as: any) => as.campaign_id).join(', ')}`);
+          }
+          
+          const adSetsBatch = filteredAdSets.map((adSet: any) => ({
               campaign_id: campaignIdMap.get(adSet.campaign_id),
               ad_set_id: adSet.id,
               name: adSet.name,
@@ -269,13 +275,19 @@ serve(async (req) => {
           }
         }
 
-        console.log(`[${logId}] Conta ${account.name}: ${allAds.length} ads encontrados`);
+        console.log(`[${logId}] Conta ${account.name}: ${allAds.length} ads encontrados da API`);
 
         // Batch upsert ads
         if (allAds.length > 0) {
-          const adsBatch = allAds
-            .filter(ad => adSetIdMap.has(ad.adset_id))
-            .map((ad: any) => ({
+          const filteredAds = allAds.filter(ad => adSetIdMap.has(ad.adset_id));
+          console.log(`[${logId}] Ads filtrados: ${filteredAds.length}/${allAds.length} (match com ad_sets existentes)`);
+          
+          if (filteredAds.length === 0 && allAds.length > 0) {
+            console.warn(`[${logId}] AVISO: Nenhum ad correspondeu aos ad_sets. AdSet IDs no mapa: ${Array.from(adSetIdMap.keys()).slice(0, 5).join(', ')}...`);
+            console.warn(`[${logId}] Ad adset_ids: ${allAds.slice(0, 5).map(a => a.adset_id).join(', ')}...`);
+          }
+          
+          const adsBatch = filteredAds.map((ad: any) => ({
               ad_set_id: adSetIdMap.get(ad.adset_id),
               ad_id: ad.id,
               name: ad.name,

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Image, AlertCircle, RefreshCw, Filter, ChevronDown } from 'lucide-react';
+import { Image, AlertCircle, RefreshCw, Filter, ChevronDown, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface CreativeData {
     id: string;
@@ -32,6 +33,7 @@ interface CreativeTableProps {
     needsSync?: boolean;
     onSyncClick?: () => void;
     isSyncing?: boolean;
+    mode?: 'ads' | 'campaigns';
     // Filter props
     accounts?: AdAccount[];
     campaigns?: Campaign[];
@@ -49,6 +51,7 @@ export const CreativeTable: React.FC<CreativeTableProps> = ({
     needsSync = false,
     onSyncClick,
     isSyncing = false,
+    mode = 'ads',
     accounts = [],
     campaigns = [],
     selectedAccountId,
@@ -62,6 +65,9 @@ export const CreativeTable: React.FC<CreativeTableProps> = ({
     const [filtersOpen, setFiltersOpen] = useState(false);
 
     const hasFilters = showFilters && (accounts.length > 0 || campaigns.length > 0);
+    
+    const title = mode === 'campaigns' ? 'Top Campanhas' : 'Criativos Destaques';
+    const itemLabel = mode === 'campaigns' ? 'Campanha' : 'Anúncio';
 
     return (
         <div className="bg-card border border-border rounded-2xl p-6">
@@ -70,19 +76,45 @@ export const CreativeTable: React.FC<CreativeTableProps> = ({
                     <div className="bg-primary/10 p-1.5 rounded-lg">
                         <Image size={16} className="text-primary" />
                     </div>
-                    <h2 className="font-bold text-foreground text-sm">Criativos Destaques</h2>
+                    <h2 className="font-bold text-foreground text-sm">{title}</h2>
+                    {mode === 'campaigns' && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <Info size={12} className="text-muted-foreground" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p className="text-xs">Sincronize campanhas para ver anúncios individuais</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
                 </div>
-                {hasFilters && (
-                    <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-                        <CollapsibleTrigger asChild>
-                            <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                                <Filter size={12} />
-                                Filtros
-                                <ChevronDown size={12} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
-                            </Button>
-                        </CollapsibleTrigger>
-                    </Collapsible>
-                )}
+                <div className="flex items-center gap-2">
+                    {onSyncClick && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={onSyncClick}
+                            disabled={isSyncing}
+                            className="gap-1 text-xs"
+                        >
+                            <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                            {isSyncing ? 'Sync...' : 'Sync'}
+                        </Button>
+                    )}
+                    {hasFilters && (
+                        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+                            <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                                    <Filter size={12} />
+                                    Filtros
+                                    <ChevronDown size={12} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+                                </Button>
+                            </CollapsibleTrigger>
+                        </Collapsible>
+                    )}
+                </div>
             </div>
 
             {hasFilters && (
@@ -162,7 +194,7 @@ export const CreativeTable: React.FC<CreativeTableProps> = ({
                     <Table>
                         <TableHeader className="border-border">
                             <TableRow className="border-border hover:bg-transparent">
-                                <TableHead className="text-muted-foreground text-[10px] uppercase font-bold">Anúncio</TableHead>
+                                <TableHead className="text-muted-foreground text-[10px] uppercase font-bold">{itemLabel}</TableHead>
                                 <TableHead className="text-muted-foreground text-[10px] uppercase font-bold text-right">Msgs</TableHead>
                                 <TableHead className="text-muted-foreground text-[10px] uppercase font-bold text-right">Custo/Msg</TableHead>
                                 <TableHead className="text-muted-foreground text-[10px] uppercase font-bold text-right">Gasto</TableHead>

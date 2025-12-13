@@ -23,6 +23,7 @@ export interface TopCreativesResult {
     creatives: CreativeMetric[];
     needsSync: boolean;
     hasAdsData: boolean;
+    mode: 'ads' | 'campaigns'; // Indicates if showing ads or fallback to campaigns
 }
 
 export const useTopCreatives = (
@@ -40,19 +41,9 @@ export const useTopCreatives = (
     return useQuery({
         queryKey: ['top-creatives', user?.id, dateFromStr, dateToStr, accountId, status, campaignId],
         queryFn: async (): Promise<TopCreativesResult> => {
-            if (!user?.id) return { creatives: [], needsSync: true, hasAdsData: false };
+            if (!user?.id) return { creatives: [], needsSync: true, hasAdsData: false, mode: 'campaigns' };
 
-            // Step 1: Check if we have ads data
-            const { count: adsCount } = await supabase
-                .from('ads')
-                .select('id', { count: 'exact', head: true });
-
-            if (!adsCount || adsCount === 0) {
-                console.log('No ads data found - sync required');
-                return { creatives: [], needsSync: true, hasAdsData: false };
-            }
-
-            // Step 2: Get user's campaigns with filters
+            // Step 1: Get user's campaigns with filters
             let campaignsQuery = supabase
                 .from('campaigns')
                 .select(`
@@ -76,7 +67,6 @@ export const useTopCreatives = (
                 campaignsQuery = campaignsQuery.eq('status', status);
             }
 
-            // Filter by campaign if specified
             if (campaignId) {
                 campaignsQuery = campaignsQuery.eq('id', campaignId);
             }
@@ -85,76 +75,135 @@ export const useTopCreatives = (
 
             if (campaignsError || !campaigns || campaigns.length === 0) {
                 console.log('No campaigns found for user');
-                return { creatives: [], needsSync: false, hasAdsData: true };
+                return { creatives: [], needsSync: false, hasAdsData: false, mode: 'campaigns' };
             }
 
             const campaignIds = campaigns.map(c => c.id);
 
-            // Step 3: Get ad_sets for these campaigns
-            const { data: adSets, error: adSetsError } = await supabase
+            // Step 2: Check if we have ads data for these campaigns
+            const { data: adSets } = await supabase
                 .from('ad_sets')
                 .select('id, campaign_id')
                 .in('campaign_id', campaignIds);
 
-            if (adSetsError || !adSets || adSets.length === 0) {
-                console.log('No ad sets found for campaigns');
-                return { creatives: [], needsSync: true, hasAdsData: false };
+            const adSetIds = (adSets || []).map(as => as.id);
+            
+            let hasAdsInDb = false;
+            let ads: any[] = [];
+            
+            if (adSetIds.length > 0) {
+                const { data: adsData, count } = await supabase
+                    .from('ads')
+                    .select('id, ad_id, name, creative_url, ad_set_id', { count: 'exact' })
+                    .in('ad_set_id', adSetIds);
+                
+                ads = adsData || [];
+                hasAdsInDb = (count || 0) > 0;
             }
 
-            const adSetIds = adSets.map(as => as.id);
+            // Step 3: If we have ads, try to get ad-level metrics
+            if (hasAdsInDb && ads.length > 0) {
+                const adIds = ads.map(a => a.id);
+                const adsMap = new Map(ads.map(a => [a.id, a]));
 
-            // Step 4: Get ads for these ad_sets
-            const { data: ads, error: adsError } = await supabase
-                .from('ads')
-                .select('id, ad_id, name, creative_url, ad_set_id')
-                .in('ad_set_id', adSetIds);
+                let metricsQuery = supabase
+                    .from('metrics')
+                    .select('ad_id, spend, impressions, clicks, conversions, messages')
+                    .in('ad_id', adIds)
+                    .gte('date', dateFromStr)
+                    .lte('date', dateToStr);
 
-            if (adsError || !ads || ads.length === 0) {
-                console.log('No ads found for ad sets');
-                return { creatives: [], needsSync: true, hasAdsData: false };
+                if (status === 'WITH_SPEND') {
+                    metricsQuery = metricsQuery.gt('spend', 0);
+                }
+
+                const { data: metrics, error: metricsError } = await metricsQuery;
+
+                if (!metricsError && metrics && metrics.length > 0) {
+                    // Aggregate metrics by ad
+                    const aggregated: Record<string, any> = {};
+
+                    for (const metric of metrics) {
+                        if (!metric.ad_id) continue;
+
+                        const ad = adsMap.get(metric.ad_id);
+                        if (!ad) continue;
+
+                        if (!aggregated[metric.ad_id]) {
+                            aggregated[metric.ad_id] = {
+                                ad_id: ad.ad_id,
+                                ad_name: ad.name,
+                                creative_url: ad.creative_url,
+                                spend: 0,
+                                impressions: 0,
+                                clicks: 0,
+                                conversions: 0,
+                                messages: 0,
+                            };
+                        }
+
+                        aggregated[metric.ad_id].spend += Number(metric.spend || 0);
+                        aggregated[metric.ad_id].impressions += Number(metric.impressions || 0);
+                        aggregated[metric.ad_id].clicks += Number(metric.clicks || 0);
+                        aggregated[metric.ad_id].conversions += Number(metric.conversions || 0);
+                        aggregated[metric.ad_id].messages += Number(metric.messages || 0);
+                    }
+
+                    const creatives = Object.values(aggregated)
+                        .map((item: any) => ({
+                            ...item,
+                            ctr: item.impressions > 0 ? (item.clicks / item.impressions) * 100 : 0,
+                            cpc: item.clicks > 0 ? item.spend / item.clicks : 0,
+                            cpa: item.conversions > 0 ? item.spend / item.conversions : 0,
+                            roas: 0,
+                            cost_per_message: item.messages > 0 ? item.spend / item.messages : 0,
+                        }))
+                        .sort((a: any, b: any) => b.spend - a.spend)
+                        .slice(0, 5);
+
+                    if (creatives.length > 0) {
+                        return { creatives, needsSync: false, hasAdsData: true, mode: 'ads' };
+                    }
+                }
             }
 
-            const adIds = ads.map(a => a.id);
-            const adsMap = new Map(ads.map(a => [a.id, a]));
-
-            // Step 5: Get metrics for these ads
-            let metricsQuery = supabase
+            // Step 4: Fallback - Show campaign-level data as "Top Campaigns"
+            console.log('Using campaign fallback mode');
+            
+            let campaignMetricsQuery = supabase
                 .from('metrics')
-                .select('ad_id, spend, impressions, clicks, conversions, messages')
-                .in('ad_id', adIds)
+                .select('campaign_id, spend, impressions, clicks, conversions, messages')
+                .in('campaign_id', campaignIds)
                 .gte('date', dateFromStr)
                 .lte('date', dateToStr);
 
             if (status === 'WITH_SPEND') {
-                metricsQuery = metricsQuery.gt('spend', 0);
+                campaignMetricsQuery = campaignMetricsQuery.gt('spend', 0);
             }
 
-            const { data: metrics, error: metricsError } = await metricsQuery;
+            const { data: campaignMetrics, error: campaignMetricsError } = await campaignMetricsQuery;
 
-            if (metricsError) {
-                console.error('Error fetching metrics for ads:', metricsError);
-                throw metricsError;
+            if (campaignMetricsError || !campaignMetrics || campaignMetrics.length === 0) {
+                return { creatives: [], needsSync: !hasAdsInDb, hasAdsData: hasAdsInDb, mode: 'campaigns' };
             }
 
-            if (!metrics || metrics.length === 0) {
-                console.log('No metrics found for ads - may need metrics sync');
-                return { creatives: [], needsSync: false, hasAdsData: true };
-            }
+            // Create a campaigns map
+            const campaignsMap = new Map(campaigns.map(c => [c.id, c]));
 
-            // Step 6: Aggregate metrics by ad
-            const aggregated: Record<string, any> = {};
+            // Aggregate by campaign
+            const campaignAggregated: Record<string, any> = {};
 
-            for (const metric of metrics) {
-                if (!metric.ad_id) continue;
+            for (const metric of campaignMetrics) {
+                if (!metric.campaign_id) continue;
 
-                const ad = adsMap.get(metric.ad_id);
-                if (!ad) continue;
+                const campaign = campaignsMap.get(metric.campaign_id);
+                if (!campaign) continue;
 
-                if (!aggregated[metric.ad_id]) {
-                    aggregated[metric.ad_id] = {
-                        ad_id: ad.ad_id,
-                        ad_name: ad.name,
-                        creative_url: ad.creative_url,
+                if (!campaignAggregated[metric.campaign_id]) {
+                    campaignAggregated[metric.campaign_id] = {
+                        ad_id: campaign.id,
+                        ad_name: campaign.name,
+                        creative_url: null,
                         spend: 0,
                         impressions: 0,
                         clicks: 0,
@@ -163,15 +212,14 @@ export const useTopCreatives = (
                     };
                 }
 
-                aggregated[metric.ad_id].spend += Number(metric.spend || 0);
-                aggregated[metric.ad_id].impressions += Number(metric.impressions || 0);
-                aggregated[metric.ad_id].clicks += Number(metric.clicks || 0);
-                aggregated[metric.ad_id].conversions += Number(metric.conversions || 0);
-                aggregated[metric.ad_id].messages += Number(metric.messages || 0);
+                campaignAggregated[metric.campaign_id].spend += Number(metric.spend || 0);
+                campaignAggregated[metric.campaign_id].impressions += Number(metric.impressions || 0);
+                campaignAggregated[metric.campaign_id].clicks += Number(metric.clicks || 0);
+                campaignAggregated[metric.campaign_id].conversions += Number(metric.conversions || 0);
+                campaignAggregated[metric.campaign_id].messages += Number(metric.messages || 0);
             }
 
-            // Step 7: Calculate derived metrics and sort
-            const creatives = Object.values(aggregated)
+            const creatives = Object.values(campaignAggregated)
                 .map((item: any) => ({
                     ...item,
                     ctr: item.impressions > 0 ? (item.clicks / item.impressions) * 100 : 0,
@@ -183,7 +231,12 @@ export const useTopCreatives = (
                 .sort((a: any, b: any) => b.spend - a.spend)
                 .slice(0, 5);
 
-            return { creatives, needsSync: false, hasAdsData: true };
+            return { 
+                creatives, 
+                needsSync: !hasAdsInDb, 
+                hasAdsData: hasAdsInDb, 
+                mode: 'campaigns' 
+            };
         },
         enabled: !!user?.id,
     });

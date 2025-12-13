@@ -246,6 +246,11 @@ serve(async (req) => {
 
             const adIdFromInsight = (insight as any).ad_id as string | undefined;
             const internalAdId = adIdFromInsight ? adIdMap.get(adIdFromInsight) || null : null;
+            
+            // Log para debug se não encontrar match
+            if (adIdFromInsight && !internalAdId) {
+              console.log(`[${logId}] Métrica com ad_id=${adIdFromInsight} não encontrou correspondência no banco`);
+            }
 
             allMetrics.push({
               campaign_id: campaign.id,
