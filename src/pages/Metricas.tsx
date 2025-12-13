@@ -8,8 +8,6 @@ import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
 import { useDailyMetrics } from '@/hooks/useDailyMetrics';
 import { useDemographics } from '@/hooks/useDemographics';
 import { useTopCreatives } from '@/hooks/useTopCreatives';
-import { useAdAccounts } from '@/hooks/useAdAccounts';
-import { useCampaigns } from '@/hooks/useCampaigns';
 import { supabase } from '@/integrations/supabase/client';
 
 import { Header } from '@/components/dashboard/Header';
@@ -32,11 +30,6 @@ export default function Metricas() {
   const [selectedLevel, setSelectedLevel] = useState<MetricLevel>('campaign');
   const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<string | undefined>(undefined);
-
-  // Creative filters state
-  const [creativeAccountId, setCreativeAccountId] = useState<string | undefined>(undefined);
-  const [creativeCampaignId, setCreativeCampaignId] = useState<string | undefined>(undefined);
-  const [creativeStatus, setCreativeStatus] = useState<string | undefined>(undefined);
   const [isSyncingCreatives, setIsSyncingCreatives] = useState(false);
 
   // Fetch daily metrics for timeline
@@ -163,23 +156,12 @@ export default function Metricas() {
     }));
   }, [demographicsData]);
 
-  // Fetch Ad Accounts and Campaigns for creative filters
-  const { data: adAccounts = [] } = useAdAccounts('meta');
-  const { data: allCampaigns = [] } = useCampaigns({ provider: 'meta' });
-
-  // Filter campaigns based on selected account for creatives
-  const filteredCampaignsForCreatives = useMemo(() => {
-    if (!creativeAccountId || creativeAccountId === 'all') return allCampaigns || [];
-    return (allCampaigns || []).filter((c: any) => c.ad_account_id === creativeAccountId);
-  }, [allCampaigns, creativeAccountId]);
-
-  // Fetch Top Creatives with local filters
+  // Fetch Top Creatives usando filtros globais de conta e status
   const { data: topCreatives, isLoading: creativesLoading } = useTopCreatives(
     dateRange?.from,
     dateRange?.to,
-    creativeAccountId === 'all' ? undefined : creativeAccountId,
-    creativeStatus === 'all' ? undefined : creativeStatus,
-    creativeCampaignId === 'all' ? undefined : creativeCampaignId
+    selectedAccountId === 'all' ? undefined : selectedAccountId,
+    status
   );
 
   // Map creatives for table
@@ -436,18 +418,6 @@ export default function Metricas() {
                 onSyncClick={handleSyncCreatives}
                 isSyncing={isSyncingCreatives}
                 mode={creativesMode}
-                showFilters={true}
-                accounts={(adAccounts || []).map((a: any) => ({ id: a.id, account_name: a.account_name }))}
-                campaigns={(filteredCampaignsForCreatives || []).map((c: any) => ({ id: c.id, name: c.name }))}
-                selectedAccountId={creativeAccountId}
-                selectedCampaignId={creativeCampaignId}
-                selectedStatus={creativeStatus}
-                onAccountChange={(val) => {
-                  setCreativeAccountId(val === 'all' ? undefined : val);
-                  setCreativeCampaignId(undefined); // Reset campaign when account changes
-                }}
-                onCampaignChange={(val) => setCreativeCampaignId(val === 'all' ? undefined : val)}
-                onStatusChange={(val) => setCreativeStatus(val === 'all' ? undefined : val)}
               />
             </div>
           </div>
