@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { subDays, format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { DollarSign, Target, Eye, Percent, ShoppingBag } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
 import { useDailyMetrics } from '@/hooks/useDailyMetrics';
@@ -9,6 +10,7 @@ import { useDemographics } from '@/hooks/useDemographics';
 import { useTopCreatives } from '@/hooks/useTopCreatives';
 import { useAdAccounts } from '@/hooks/useAdAccounts';
 import { useCampaigns } from '@/hooks/useCampaigns';
+import { supabase } from '@/integrations/supabase/client';
 
 import { Header } from '@/components/dashboard/Header';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
@@ -35,6 +37,7 @@ export default function Metricas() {
   const [creativeAccountId, setCreativeAccountId] = useState<string | undefined>(undefined);
   const [creativeCampaignId, setCreativeCampaignId] = useState<string | undefined>(undefined);
   const [creativeStatus, setCreativeStatus] = useState<string | undefined>(undefined);
+  const [isSyncingCreatives, setIsSyncingCreatives] = useState(false);
 
   // Fetch daily metrics for timeline
   const { data: dailyMetrics, isLoading: dailyLoading } = useDailyMetrics(
@@ -195,8 +198,40 @@ export default function Metricas() {
     }));
   }, [topCreatives]);
 
-  // Check if creatives need sync
+  // Check if creatives need sync and mode
   const creativesNeedSync = topCreatives?.needsSync ?? false;
+  const creativesMode = topCreatives?.mode ?? 'campaigns';
+
+  // Sync creatives function
+  const handleSyncCreatives = async () => {
+    setIsSyncingCreatives(true);
+    try {
+      // First sync campaigns to get ads
+      const { error: campaignsError } = await supabase.functions.invoke('sync-meta-campaigns');
+      if (campaignsError) {
+        console.error('Error syncing campaigns:', campaignsError);
+        toast.error('Erro ao sincronizar campanhas');
+        return;
+      }
+      
+      // Then sync metrics
+      const { error: metricsError } = await supabase.functions.invoke('sync-meta-metrics');
+      if (metricsError) {
+        console.error('Error syncing metrics:', metricsError);
+        toast.error('Erro ao sincronizar métricas');
+        return;
+      }
+      
+      toast.success('Sincronização concluída!');
+      // Refetch creatives data
+      window.location.reload();
+    } catch (error) {
+      console.error('Error syncing creatives:', error);
+      toast.error('Erro ao sincronizar');
+    } finally {
+      setIsSyncingCreatives(false);
+    }
+  };
 
   const isLoading = dailyLoading || campaignsLoading || demographicsLoading || creativesLoading;
   const anyError = campaignsError;
@@ -398,6 +433,9 @@ export default function Metricas() {
               <CreativeTable 
                 creatives={creativeTableData} 
                 needsSync={creativesNeedSync}
+                onSyncClick={handleSyncCreatives}
+                isSyncing={isSyncingCreatives}
+                mode={creativesMode}
                 showFilters={true}
                 accounts={(adAccounts || []).map((a: any) => ({ id: a.id, account_name: a.account_name }))}
                 campaigns={(filteredCampaignsForCreatives || []).map((c: any) => ({ id: c.id, name: c.name }))}
