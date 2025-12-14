@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Image, AlertCircle, RefreshCw, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { LastSyncIndicator } from '@/components/dashboard/LastSyncIndicator';
 
 interface CreativeData {
   id: string;
@@ -22,6 +23,8 @@ interface CreativeTableProps {
   onSyncClick?: () => void;
   isSyncing?: boolean;
   mode?: 'ads' | 'campaigns';
+  lastSyncAt?: Date | null;
+  lastSyncLoading?: boolean;
 }
 
 export const CreativeTable: React.FC<CreativeTableProps> = ({
@@ -30,13 +33,15 @@ export const CreativeTable: React.FC<CreativeTableProps> = ({
   onSyncClick,
   isSyncing = false,
   mode = 'ads',
+  lastSyncAt,
+  lastSyncLoading = false,
 }) => {
   const title = mode === 'campaigns' ? 'Top Campanhas' : 'Criativos Destaques';
   const itemLabel = mode === 'campaigns' ? 'Campanha' : 'Anúncio';
 
   return (
     <div className="bg-card border border-border rounded-2xl p-6">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-2">
           <div className="bg-primary/10 p-1.5 rounded-lg">
             <Image size={16} className="text-primary" />
@@ -69,6 +74,10 @@ export const CreativeTable: React.FC<CreativeTableProps> = ({
             </Button>
           )}
         </div>
+      </div>
+      
+      <div className="mb-4">
+        <LastSyncIndicator lastSyncAt={lastSyncAt} isLoading={lastSyncLoading} />
       </div>
 
       {needsSync ? (
