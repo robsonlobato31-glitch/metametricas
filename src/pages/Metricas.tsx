@@ -8,6 +8,7 @@ import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
 import { useDailyMetrics } from '@/hooks/useDailyMetrics';
 import { useDemographics } from '@/hooks/useDemographics';
 import { useTopCreatives } from '@/hooks/useTopCreatives';
+import { useLastSync } from '@/hooks/useLastSync';
 import { supabase } from '@/integrations/supabase/client';
 
 import { Header } from '@/components/dashboard/Header';
@@ -18,6 +19,7 @@ import { DemographicsChart } from '@/components/dashboard/DemographicsChart';
 import { VideoFunnel } from '@/components/dashboard/VideoFunnel';
 import { CampaignTable } from '@/components/dashboard/CampaignTable';
 import { CreativeTable } from '@/components/dashboard/CreativeTable';
+import { LastSyncIndicator } from '@/components/dashboard/LastSyncIndicator';
 
 import { KPI, FunnelStep, MetricLevel } from '@/components/dashboard/types';
 
@@ -163,6 +165,9 @@ export default function Metricas() {
     selectedAccountId === 'all' ? undefined : selectedAccountId,
     status
   );
+
+  // Fetch last sync info for metrics
+  const { data: lastMetricsSync, isLoading: lastSyncLoading } = useLastSync('sync-meta-metrics');
 
   // Map creatives for table
   const creativeTableData = useMemo(() => {
@@ -395,6 +400,11 @@ export default function Metricas() {
             onStatusChange={setStatus}
           />
 
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-foreground">Métricas</h2>
+            <LastSyncIndicator lastSyncAt={lastMetricsSync?.lastSyncAt} isLoading={lastSyncLoading} />
+          </div>
+
           <div className="grid grid-cols-12 gap-6 animate-fade-in">
             {/* Left Column */}
             <div className="col-span-12 xl:col-span-5 flex flex-col gap-6">
@@ -418,6 +428,8 @@ export default function Metricas() {
                 onSyncClick={handleSyncCreatives}
                 isSyncing={isSyncingCreatives}
                 mode={creativesMode}
+                lastSyncAt={lastMetricsSync?.lastSyncAt}
+                lastSyncLoading={lastSyncLoading}
               />
             </div>
           </div>
