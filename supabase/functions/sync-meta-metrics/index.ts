@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Aumentado para processar mais campanhas
-const MAX_CAMPAIGNS_PER_SYNC = 50;
 
 // Helper para delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -97,9 +95,7 @@ serve(async (req) => {
         ad_accounts!inner(integration_id, account_name)
       `)
       .eq('ad_accounts.integration_id', integration.id)
-      .eq('sync_enabled', true)
-      .order('status', { ascending: true }) // ACTIVE primeiro
-      .limit(MAX_CAMPAIGNS_PER_SYNC);
+      .eq('sync_enabled', true);
 
     if (campaignsError) {
       throw new Error('Erro ao buscar campanhas');
