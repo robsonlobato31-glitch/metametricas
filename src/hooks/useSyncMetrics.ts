@@ -1,10 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 export const useSyncMetrics = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isFullSyncLoading, setIsFullSyncLoading] = useState(false);
 
   const syncMetaMutation = useMutation({
     mutationFn: async () => {
@@ -16,8 +18,8 @@ export const useSyncMetrics = () => {
       return data;
     },
     onSuccess: (data) => {
-      // Invalida queries de métricas para recarregar dados
       queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['topCreatives'] });
       
       toast({
         title: 'Métricas Sincronizadas!',
@@ -33,6 +35,24 @@ export const useSyncMetrics = () => {
     },
   });
 
+  const syncMetaCampaignsMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('sync-meta-campaigns', {
+        method: 'POST',
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['adAccounts'] });
+    },
+    onError: (error: any) => {
+      throw error;
+    },
+  });
+
   const syncGoogleMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('sync-google-ads-metrics', {
@@ -43,7 +63,6 @@ export const useSyncMetrics = () => {
       return data;
     },
     onSuccess: (data) => {
-      // Invalida queries de métricas para recarregar dados
       queryClient.invalidateQueries({ queryKey: ['metrics'] });
       
       toast({
@@ -60,9 +79,45 @@ export const useSyncMetrics = () => {
     },
   });
 
+  const fullMetaSync = async () => {
+    setIsFullSyncLoading(true);
+    try {
+      toast({
+        title: 'Sincronização Completa Iniciada',
+        description: 'Sincronizando campanhas e ads...',
+      });
+
+      // Step 1: Sync campaigns, ad sets, and ads
+      await syncMetaCampaignsMutation.mutateAsync();
+      
+      toast({
+        title: 'Campanhas Sincronizadas!',
+        description: 'Agora sincronizando métricas...',
+      });
+
+      // Step 2: Sync metrics (now with ad_ids available)
+      await syncMetaMutation.mutateAsync();
+
+      toast({
+        title: 'Sincronização Completa!',
+        description: 'Campanhas, ads e métricas foram sincronizados com sucesso.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro na Sincronização',
+        description: error.message || 'Ocorreu um erro durante a sincronização.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsFullSyncLoading(false);
+    }
+  };
+
   return {
     syncMeta: syncMetaMutation.mutate,
     syncGoogle: syncGoogleMutation.mutate,
+    fullMetaSync,
     isLoading: syncMetaMutation.isPending || syncGoogleMutation.isPending,
+    isFullSyncLoading,
   };
 };
