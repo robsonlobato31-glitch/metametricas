@@ -152,7 +152,7 @@ serve(async (req) => {
 
     for (const campaign of campaigns) {
       try {
-        const fields = 'date_start,impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr,cpc,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
+        const fields = 'ad_id,date_start,impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr,cpc,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
         const timeRange = `{"since":"${since}","until":"${until}"}`;
 
         // Buscar insights da campanha em nível de ANÚNCIO (ad)
