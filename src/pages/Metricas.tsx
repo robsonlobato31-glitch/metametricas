@@ -20,6 +20,7 @@ import { VideoFunnel } from '@/components/dashboard/VideoFunnel';
 import { CampaignTable } from '@/components/dashboard/CampaignTable';
 import { CreativeTable } from '@/components/dashboard/CreativeTable';
 import { LastSyncIndicator } from '@/components/dashboard/LastSyncIndicator';
+import { SyncMetricsButton } from '@/components/SyncMetricsButton';
 
 import { KPI, FunnelStep, MetricLevel } from '@/components/dashboard/types';
 
@@ -402,7 +403,10 @@ export default function Metricas() {
 
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-foreground">Métricas</h2>
-            <LastSyncIndicator lastSyncAt={lastMetricsSync?.lastSyncAt} isLoading={lastSyncLoading} />
+            <div className="flex items-center gap-3">
+              <SyncMetricsButton provider="meta" fullSync />
+              <LastSyncIndicator lastSyncAt={lastMetricsSync?.lastSyncAt} isLoading={lastSyncLoading} />
+            </div>
           </div>
 
           <div className="grid grid-cols-12 gap-6 animate-fade-in">
