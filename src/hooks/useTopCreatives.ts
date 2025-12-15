@@ -74,43 +74,18 @@ export const useTopCreatives = (
             const { data: campaigns, error: campaignsError } = await campaignsQuery;
 
             if (campaignsError || !campaigns || campaigns.length === 0) {
-                console.log('No campaigns found for user');
                 return { creatives: [], needsSync: false, hasAdsData: false, mode: 'campaigns' };
             }
 
             const campaignIds = campaigns.map(c => c.id);
             const campaignsMap = new Map(campaigns.map(c => [c.id, c]));
 
-            // Step 2: Get ads for these campaigns (via ad_sets)
-            const { data: adSets } = await supabase
-                .from('ad_sets')
-                .select('id, campaign_id')
-                .in('campaign_id', campaignIds);
-
-            const adSetIds = (adSets || []).map(as => as.id);
-            const adSetToCampaign = new Map((adSets || []).map(as => [as.id, as.campaign_id]));
-            
-            let ads: any[] = [];
-            
-            if (adSetIds.length > 0) {
-                const { data: adsData } = await supabase
-                    .from('ads')
-                    .select('id, ad_id, name, creative_url, ad_set_id, status')
-                    .in('ad_set_id', adSetIds);
-                
-                ads = adsData || [];
-            }
-
-            // If no ads exist, fallback to campaigns
-            if (ads.length === 0) {
-                return await getCampaignFallback(campaignIds, campaignsMap, dateFromStr, dateToStr, status);
-            }
-
-            // Step 3: Get campaign-level metrics (since ad_id in metrics table is always null)
+            // Step 2: Get metrics with ad_id (ad-level metrics)
             let metricsQuery = supabase
                 .from('metrics')
-                .select('campaign_id, spend, impressions, clicks, conversions, messages')
+                .select('ad_id, campaign_id, spend, impressions, clicks, conversions, messages')
                 .in('campaign_id', campaignIds)
+                .not('ad_id', 'is', null)
                 .gte('date', dateFromStr)
                 .lte('date', dateToStr);
 
@@ -118,75 +93,73 @@ export const useTopCreatives = (
                 metricsQuery = metricsQuery.gt('spend', 0);
             }
 
-            const { data: metrics, error: metricsError } = await metricsQuery;
+            const { data: adMetrics, error: metricsError } = await metricsQuery;
 
-            if (metricsError || !metrics || metrics.length === 0) {
-                return { creatives: [], needsSync: false, hasAdsData: true, mode: 'ads' };
+            // If no ad-level metrics, fallback to campaign-level
+            if (metricsError || !adMetrics || adMetrics.length === 0) {
+                return await getCampaignFallback(campaignIds, campaignsMap, dateFromStr, dateToStr, status);
             }
 
-            // Step 4: Aggregate metrics by campaign
-            const campaignMetrics: Record<string, { spend: number; impressions: number; clicks: number; conversions: number; messages: number }> = {};
+            // Step 3: Get ads info for the ad_ids we found
+            const adIds = [...new Set(adMetrics.map(m => m.ad_id).filter(Boolean))] as string[];
             
-            for (const metric of metrics) {
-                if (!metric.campaign_id) continue;
-                
-                if (!campaignMetrics[metric.campaign_id]) {
-                    campaignMetrics[metric.campaign_id] = { spend: 0, impressions: 0, clicks: 0, conversions: 0, messages: 0 };
+            const { data: ads } = await supabase
+                .from('ads')
+                .select('id, ad_id, name, creative_url')
+                .in('id', adIds);
+
+            const adsMap = new Map((ads || []).map(ad => [ad.id, ad]));
+
+            // Step 4: Aggregate metrics by ad_id
+            const adAggregated: Record<string, {
+                ad_id: string;
+                spend: number;
+                impressions: number;
+                clicks: number;
+                conversions: number;
+                messages: number;
+            }> = {};
+
+            for (const metric of adMetrics) {
+                if (!metric.ad_id) continue;
+
+                if (!adAggregated[metric.ad_id]) {
+                    adAggregated[metric.ad_id] = {
+                        ad_id: metric.ad_id,
+                        spend: 0,
+                        impressions: 0,
+                        clicks: 0,
+                        conversions: 0,
+                        messages: 0,
+                    };
                 }
-                
-                campaignMetrics[metric.campaign_id].spend += Number(metric.spend || 0);
-                campaignMetrics[metric.campaign_id].impressions += Number(metric.impressions || 0);
-                campaignMetrics[metric.campaign_id].clicks += Number(metric.clicks || 0);
-                campaignMetrics[metric.campaign_id].conversions += Number(metric.conversions || 0);
-                campaignMetrics[metric.campaign_id].messages += Number(metric.messages || 0);
+
+                adAggregated[metric.ad_id].spend += Number(metric.spend || 0);
+                adAggregated[metric.ad_id].impressions += Number(metric.impressions || 0);
+                adAggregated[metric.ad_id].clicks += Number(metric.clicks || 0);
+                adAggregated[metric.ad_id].conversions += Number(metric.conversions || 0);
+                adAggregated[metric.ad_id].messages += Number(metric.messages || 0);
             }
 
-            // Step 5: Distribute campaign metrics proportionally among ads
-            // Group ads by campaign
-            const adsByCampaign: Record<string, any[]> = {};
-            for (const ad of ads) {
-                const campaignId = adSetToCampaign.get(ad.ad_set_id);
-                if (!campaignId) continue;
-                
-                if (!adsByCampaign[campaignId]) {
-                    adsByCampaign[campaignId] = [];
-                }
-                adsByCampaign[campaignId].push(ad);
-            }
-
-            // Build creatives list with distributed metrics
-            const creatives: CreativeMetric[] = [];
-
-            for (const [cmpId, cmpAds] of Object.entries(adsByCampaign)) {
-                const cmpMetric = campaignMetrics[cmpId];
-                if (!cmpMetric) continue;
-
-                // Distribute metrics equally among ads in the campaign
-                const adCount = cmpAds.length;
-                const perAdSpend = cmpMetric.spend / adCount;
-                const perAdImpressions = cmpMetric.impressions / adCount;
-                const perAdClicks = cmpMetric.clicks / adCount;
-                const perAdConversions = cmpMetric.conversions / adCount;
-                const perAdMessages = cmpMetric.messages / adCount;
-
-                for (const ad of cmpAds) {
-                    creatives.push({
-                        ad_id: ad.ad_id,
-                        ad_name: ad.name,
-                        creative_url: ad.creative_url,
-                        spend: perAdSpend,
-                        impressions: perAdImpressions,
-                        clicks: perAdClicks,
-                        conversions: perAdConversions,
-                        messages: perAdMessages,
-                        ctr: perAdImpressions > 0 ? (perAdClicks / perAdImpressions) * 100 : 0,
-                        cpc: perAdClicks > 0 ? perAdSpend / perAdClicks : 0,
-                        cpa: perAdConversions > 0 ? perAdSpend / perAdConversions : 0,
-                        roas: 0,
-                        cost_per_message: perAdMessages > 0 ? perAdSpend / perAdMessages : 0,
-                    });
-                }
-            }
+            // Step 5: Build creatives list
+            const creatives: CreativeMetric[] = Object.values(adAggregated).map(item => {
+                const adInfo = adsMap.get(item.ad_id);
+                return {
+                    ad_id: adInfo?.ad_id || item.ad_id,
+                    ad_name: adInfo?.name || 'Anúncio sem nome',
+                    creative_url: adInfo?.creative_url || null,
+                    spend: item.spend,
+                    impressions: item.impressions,
+                    clicks: item.clicks,
+                    conversions: item.conversions,
+                    messages: item.messages,
+                    ctr: item.impressions > 0 ? (item.clicks / item.impressions) * 100 : 0,
+                    cpc: item.clicks > 0 ? item.spend / item.clicks : 0,
+                    cpa: item.conversions > 0 ? item.spend / item.conversions : 0,
+                    roas: 0,
+                    cost_per_message: item.messages > 0 ? item.spend / item.messages : 0,
+                };
+            });
 
             // Sort by spend and take top 5
             const topCreatives = creatives
