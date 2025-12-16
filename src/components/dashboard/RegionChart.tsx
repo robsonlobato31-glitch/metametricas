@@ -1,6 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { MapPin } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface RegionData {
   breakdown_value: string;
@@ -13,6 +20,14 @@ interface RegionData {
 interface RegionChartProps {
   data: RegionData[];
 }
+
+type MetricType = 'impressions' | 'clicks' | 'spend';
+
+const METRIC_LABELS: Record<MetricType, string> = {
+  impressions: 'Impressões',
+  clicks: 'Cliques',
+  spend: 'Gasto',
+};
 
 const formatNumber = (value: number) => {
   if (value >= 1000000) {
@@ -35,14 +50,29 @@ const formatCurrency = (value: number) => {
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'];
 
 export const RegionChart: React.FC<RegionChartProps> = ({ data }) => {
-  const chartData = data.map((item, index) => ({
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>('impressions');
+
+  // Sort data by selected metric and take top 10
+  const sortedData = [...data]
+    .sort((a, b) => b[selectedMetric] - a[selectedMetric])
+    .slice(0, 10);
+
+  const chartData = sortedData.map((item, index) => ({
     name: item.breakdown_value,
+    value: item[selectedMetric],
     impressions: item.impressions,
     clicks: item.clicks,
     spend: item.spend,
     conversions: item.conversions,
     color: COLORS[index % COLORS.length],
   }));
+
+  const formatValue = (value: number) => {
+    if (selectedMetric === 'spend') {
+      return formatCurrency(value);
+    }
+    return formatNumber(value);
+  };
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -79,6 +109,18 @@ export const RegionChart: React.FC<RegionChartProps> = ({ data }) => {
           </div>
           <h2 className="font-bold text-gray-100 text-sm">Região</h2>
         </div>
+        <Select value={selectedMetric} onValueChange={(value) => setSelectedMetric(value as MetricType)}>
+          <SelectTrigger className="w-[120px] h-7 text-xs bg-dark-card border-dark-border">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-dark-card border-dark-border">
+            {(Object.keys(METRIC_LABELS) as MetricType[]).map((metric) => (
+              <SelectItem key={metric} value={metric} className="text-xs">
+                {METRIC_LABELS[metric]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="h-[220px] relative">
@@ -91,7 +133,7 @@ export const RegionChart: React.FC<RegionChartProps> = ({ data }) => {
             >
               <XAxis 
                 type="number" 
-                tickFormatter={formatNumber}
+                tickFormatter={(value) => selectedMetric === 'spend' ? `R$${formatNumber(value)}` : formatNumber(value)}
                 tick={{ fill: '#6b7280', fontSize: 10 }}
                 axisLine={{ stroke: '#374151' }}
                 tickLine={{ stroke: '#374151' }}
@@ -106,7 +148,7 @@ export const RegionChart: React.FC<RegionChartProps> = ({ data }) => {
                 tickFormatter={(value) => value.length > 12 ? `${value.substring(0, 12)}...` : value}
               />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }} />
-              <Bar dataKey="impressions" radius={[0, 4, 4, 0]}>
+              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
