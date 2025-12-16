@@ -347,6 +347,42 @@ serve(async (req) => {
           } catch (e) {
             console.error(`[${logId}] Erro ao buscar breakdown de gênero:`, e);
           }
+
+          // Region breakdown
+          try {
+            const regionUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=campaign&fields=${demographicFields}&time_range=${timeRange}&breakdowns=region&time_increment=1&access_token=${accessToken}`;
+            const regionRes = await fetch(regionUrl);
+            if (regionRes.ok) {
+              const { data: regionData } = await regionRes.json();
+              if (regionData) {
+                for (const item of regionData) {
+                  // Extrair conversões das actions
+                  let conversions = 0;
+                  if (item.actions && Array.isArray(item.actions)) {
+                    for (const action of item.actions) {
+                      const type = action.action_type;
+                      if (type.includes('purchase') || type.includes('conversion') || type.includes('lead')) {
+                        conversions += parseInt(action.value || '0');
+                      }
+                    }
+                  }
+                  
+                  allBreakdowns.push({
+                    campaign_id: campaign.id,
+                    date: item.date_start,
+                    breakdown_type: 'region',
+                    breakdown_value: item.region || 'unknown',
+                    impressions: parseInt(item.impressions) || 0,
+                    clicks: parseInt(item.clicks) || 0,
+                    spend: parseFloat(item.spend) || 0,
+                    conversions: conversions,
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            console.error(`[${logId}] Erro ao buscar breakdown de região:`, e);
+          }
         }
 
         // Delay entre campanhas

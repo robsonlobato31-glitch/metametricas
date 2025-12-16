@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
 import { useDailyMetrics } from '@/hooks/useDailyMetrics';
 import { useDemographics } from '@/hooks/useDemographics';
+import { useRegionBreakdown } from '@/hooks/useRegionBreakdown';
 import { useTopCreatives } from '@/hooks/useTopCreatives';
 import { useLastSync } from '@/hooks/useLastSync';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +17,7 @@ import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { FunnelChart } from '@/components/dashboard/FunnelChart';
 import { TimelineChart } from '@/components/dashboard/TimelineChart';
 import { DemographicsChart } from '@/components/dashboard/DemographicsChart';
+import { RegionChart } from '@/components/dashboard/RegionChart';
 import { VideoFunnel } from '@/components/dashboard/VideoFunnel';
 import { CampaignTable } from '@/components/dashboard/CampaignTable';
 import { CreativeTable } from '@/components/dashboard/CreativeTable';
@@ -145,6 +147,14 @@ export default function Metricas() {
     status
   );
 
+  // Fetch Region Breakdown
+  const { data: regionData, isLoading: regionLoading } = useRegionBreakdown(
+    dateRange?.from,
+    dateRange?.to,
+    selectedAccountId === 'all' ? undefined : selectedAccountId,
+    status
+  );
+
   // Transform demographics for chart format
   const demographicChartData = useMemo(() => {
     if (!demographicsData?.age || demographicsData.age.length === 0) return [];
@@ -220,7 +230,7 @@ export default function Metricas() {
     }
   };
 
-  const isLoading = dailyLoading || campaignsLoading || demographicsLoading || creativesLoading;
+  const isLoading = dailyLoading || campaignsLoading || demographicsLoading || regionLoading || creativesLoading;
   const anyError = campaignsError;
 
   // Format functions
@@ -421,6 +431,7 @@ export default function Metricas() {
             {/* Right Column */}
             <div className="col-span-12 md:col-span-6 xl:col-span-4 flex flex-col gap-6">
               <DemographicsChart data={demographicChartData} />
+              <RegionChart data={regionData || []} />
               {hasVideoData && <VideoFunnel metrics={videoMetrics} />}
               <CreativeTable 
                 creatives={creativeTableData} 
