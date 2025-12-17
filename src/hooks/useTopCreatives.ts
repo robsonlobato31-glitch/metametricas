@@ -164,10 +164,10 @@ export const useTopCreatives = (
                 // Distribute metrics equally among ads in the campaign
                 const adCount = cmpAds.length;
                 const perAdSpend = cmpMetric.spend / adCount;
-                const perAdImpressions = cmpMetric.impressions / adCount;
-                const perAdClicks = cmpMetric.clicks / adCount;
-                const perAdConversions = cmpMetric.conversions / adCount;
-                const perAdMessages = cmpMetric.messages / adCount;
+                const perAdImpressions = Math.round(cmpMetric.impressions / adCount);
+                const perAdClicks = Math.round(cmpMetric.clicks / adCount);
+                const perAdConversions = Math.round(cmpMetric.conversions / adCount);
+                const perAdMessages = Math.round(cmpMetric.messages / adCount);
 
                 for (const ad of cmpAds) {
                     creatives.push({
