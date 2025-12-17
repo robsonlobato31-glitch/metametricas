@@ -27,26 +27,36 @@ export const useRegionBreakdown = (
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Buscar as campanhas do usuário com os filtros aplicados
+      // Etapa 1: Buscar as contas de anúncio do usuário
+      const { data: accounts, error: accountsError } = await supabase
+        .from('ad_accounts')
+        .select('id, integration_id')
+        .eq('is_active', true);
+
+      if (accountsError) {
+        console.error('Error fetching ad accounts:', accountsError);
+        throw accountsError;
+      }
+
+      if (!accounts || accounts.length === 0) {
+        return [];
+      }
+
+      // Filtrar por conta específica se fornecido
+      let accountIds = accounts.map(a => a.id);
+      if (accountId) {
+        accountIds = accountIds.filter(id => id === accountId);
+      }
+
+      if (accountIds.length === 0) {
+        return [];
+      }
+
+      // Etapa 2: Buscar campanhas dessas contas
       let campaignsQuery = supabase
         .from('campaigns')
-        .select(`
-          id,
-          status,
-          ad_account_id,
-          ad_accounts!inner(
-            id,
-            integration_id,
-            integrations!inner(
-              user_id
-            )
-          )
-        `)
-        .eq('ad_accounts.integrations.user_id', user.id);
-
-      if (accountId) {
-        campaignsQuery = campaignsQuery.eq('ad_account_id', accountId);
-      }
+        .select('id, status, ad_account_id')
+        .in('ad_account_id', accountIds);
 
       if (status && status !== 'WITH_SPEND') {
         campaignsQuery = campaignsQuery.eq('status', status);
@@ -65,7 +75,7 @@ export const useRegionBreakdown = (
 
       const campaignIds = campaigns.map(c => c.id);
 
-      // Buscar os breakdowns de região para essas campanhas
+      // Etapa 3: Buscar os breakdowns de região para essas campanhas
       let breakdownsQuery = supabase
         .from('metric_breakdowns')
         .select('breakdown_type, breakdown_value, impressions, clicks, spend, conversions')
