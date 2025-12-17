@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { subDays, format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { DollarSign, Target, Eye, Percent, ShoppingBag } from 'lucide-react';
+import { DollarSign, Target, Eye, Percent, ShoppingBag, MousePointerClick } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useCampaignMetrics } from '@/hooks/useCampaignMetrics';
@@ -10,6 +10,7 @@ import { useDemographics } from '@/hooks/useDemographics';
 import { useRegionBreakdown } from '@/hooks/useRegionBreakdown';
 import { useTopCreatives } from '@/hooks/useTopCreatives';
 import { useLastSync } from '@/hooks/useLastSync';
+import { useFunnelData } from '@/hooks/useFunnelData';
 import { supabase } from '@/integrations/supabase/client';
 
 import { Header } from '@/components/dashboard/Header';
@@ -179,6 +180,13 @@ export default function Metricas() {
   // Fetch last sync info for metrics
   const { data: lastMetricsSync, isLoading: lastSyncLoading } = useLastSync('sync-meta-metrics');
 
+  // Fetch real funnel data
+  const { data: funnelMetrics, isLoading: funnelLoading } = useFunnelData({
+    dateFrom: dateRange?.from,
+    dateTo: dateRange?.to,
+    provider: 'meta',
+  });
+
   // Map creatives for table
   const creativeTableData = useMemo(() => {
     if (!topCreatives?.creatives) return [];
@@ -230,7 +238,7 @@ export default function Metricas() {
     }
   };
 
-  const isLoading = dailyLoading || campaignsLoading || demographicsLoading || regionLoading || creativesLoading;
+  const isLoading = dailyLoading || campaignsLoading || demographicsLoading || regionLoading || creativesLoading || funnelLoading;
   const anyError = campaignsError;
 
   // Format functions
@@ -356,43 +364,46 @@ export default function Metricas() {
     { label: 'CPM', value: formatCurrency(totals.cpm), icon: Eye },
   ];
 
-  // Funnel Data - Real Data
-  const funnelData: FunnelStep[] = [
-    {
-      label: 'Orçamento',
-      value: formatCurrency(totals.budget),
-      subLabel: 'Orçamento total'
-    },
-    {
-      label: 'Gasto',
-      value: formatCurrency(totals.spend),
-      subLabel: 'Valor gasto',
-      percent: totals.budget > 0 ? `${((totals.spend / totals.budget) * 100).toFixed(2)}%` : '0%'
-    },
-    {
-      label: 'CPM',
-      value: formatCurrency(totals.cpm),
-      subLabel: 'Custo por mil'
-    },
-    {
-      label: 'CTR',
-      value: `${totals.ctr.toFixed(2)}%`,
-      subLabel: 'Taxa de cliques'
-    },
-    {
-      label: 'Mensagens',
-      value: formatNumber(totals.messages),
-      subLabel: 'Total de mensagens'
-    },
-    {
-      label: 'Custo/Msg',
-      value: formatCurrency(totals.cost_per_message),
-      subLabel: 'Custo por mensagem'
-    },
-  ];
+  // Funnel Data - Real Conversion Funnel
+  const funnelData: FunnelStep[] = useMemo(() => {
+    const impressions = funnelMetrics?.impressions || totals.impressions;
+    const linkClicks = funnelMetrics?.linkClicks || totals.link_clicks;
+    const pageViews = funnelMetrics?.pageViews || totals.page_views;
+    const initiatedCheckout = funnelMetrics?.initiatedCheckout || totals.initiated_checkout;
+    const purchases = funnelMetrics?.purchases || totals.purchases;
 
-  // Demographics Data - Empty for now as we don't have real data source yet
-  // const demographicsData: any[] = []; // REMOVED
+    return [
+      {
+        label: 'Impressões',
+        value: formatNumber(impressions),
+        subLabel: 'Alcance total',
+      },
+      {
+        label: 'Cliques',
+        value: formatNumber(linkClicks),
+        subLabel: 'Cliques no link',
+        percent: impressions > 0 ? `${((linkClicks / impressions) * 100).toFixed(2)}%` : '0%',
+      },
+      {
+        label: 'Páginas',
+        value: formatNumber(pageViews),
+        subLabel: 'Visualizações',
+        percent: linkClicks > 0 ? `${((pageViews / linkClicks) * 100).toFixed(2)}%` : '0%',
+      },
+      {
+        label: 'Checkout',
+        value: formatNumber(initiatedCheckout),
+        subLabel: 'Iniciaram checkout',
+        percent: pageViews > 0 ? `${((initiatedCheckout / pageViews) * 100).toFixed(2)}%` : '0%',
+      },
+      {
+        label: 'Compras',
+        value: formatNumber(purchases),
+        subLabel: 'Conversões finais',
+        percent: initiatedCheckout > 0 ? `${((purchases / initiatedCheckout) * 100).toFixed(2)}%` : '0%',
+      },
+    ];
+  }, [funnelMetrics, totals]);
 
   return (
     <div className="min-h-screen bg-dark-bg text-gray-200 font-sans selection:bg-brand-500/30 overflow-x-hidden">

@@ -27,11 +27,32 @@ export const useRegionBreakdown = (
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Etapa 1: Buscar as contas de anúncio do usuário
-      const { data: accounts, error: accountsError } = await supabase
+      // Etapa 1: Buscar integrações do usuário
+      const { data: integrations, error: integrationsError } = await supabase
+        .from('integrations')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+
+      if (integrationsError) {
+        console.error('Error fetching integrations:', integrationsError);
+        throw integrationsError;
+      }
+
+      if (!integrations || integrations.length === 0) {
+        return [];
+      }
+
+      const integrationIds = integrations.map(i => i.id);
+
+      // Etapa 2: Buscar as contas de anúncio das integrações do usuário
+      let accountsQuery = supabase
         .from('ad_accounts')
-        .select('id, integration_id')
+        .select('id')
+        .in('integration_id', integrationIds)
         .eq('is_active', true);
+
+      const { data: accounts, error: accountsError } = await accountsQuery;
 
       if (accountsError) {
         console.error('Error fetching ad accounts:', accountsError);
@@ -52,7 +73,7 @@ export const useRegionBreakdown = (
         return [];
       }
 
-      // Etapa 2: Buscar campanhas dessas contas
+      // Etapa 3: Buscar campanhas dessas contas
       let campaignsQuery = supabase
         .from('campaigns')
         .select('id, status, ad_account_id')
@@ -75,7 +96,7 @@ export const useRegionBreakdown = (
 
       const campaignIds = campaigns.map(c => c.id);
 
-      // Etapa 3: Buscar os breakdowns de região para essas campanhas
+      // Etapa 4: Buscar os breakdowns de região para essas campanhas
       let breakdownsQuery = supabase
         .from('metric_breakdowns')
         .select('breakdown_type, breakdown_value, impressions, clicks, spend, conversions')

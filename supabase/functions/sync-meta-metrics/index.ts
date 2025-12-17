@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-
 // Helper para delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -31,6 +30,222 @@ async function batchInsert(
   return insertedCount;
 }
 
+// Processar uma campanha com timeout
+async function processCampaignWithTimeout(
+  campaign: any,
+  accessToken: string,
+  since: string,
+  until: string,
+  adIdMap: Map<string, string>,
+  logId: string,
+  timeoutMs = 15000
+): Promise<{ metrics: any[]; breakdowns: any[]; disable: boolean; error: boolean }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const result = await processCampaign(campaign, accessToken, since, until, adIdMap, logId, controller.signal);
+    clearTimeout(timeout);
+    return result;
+  } catch (error: unknown) {
+    clearTimeout(timeout);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn(`[${logId}] Timeout ao processar campanha ${campaign.campaign_id}`);
+    }
+    return { metrics: [], breakdowns: [], disable: false, error: true };
+  }
+}
+
+// Processar uma campanha individual
+async function processCampaign(
+  campaign: any,
+  accessToken: string,
+  since: string,
+  until: string,
+  adIdMap: Map<string, string>,
+  logId: string,
+  signal?: AbortSignal
+): Promise<{ metrics: any[]; breakdowns: any[]; disable: boolean; error: boolean }> {
+  const metrics: any[] = [];
+  const breakdowns: any[] = [];
+  
+  const fields = 'date_start,impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr,cpc,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
+  const timeRange = `{"since":"${since}","until":"${until}"}`;
+
+  // Buscar insights da campanha em nível de ANÚNCIO (ad)
+  const campaignUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=ad&fields=${fields}&time_range=${timeRange}&time_increment=1&access_token=${accessToken}`;
+  const campaignRes = await fetch(campaignUrl, { signal });
+
+  if (!campaignRes.ok) {
+    const errorText = await campaignRes.text();
+    if (errorText.includes('"code":100') || errorText.includes('does not exist')) {
+      console.warn(`[${logId}] Campanha ${campaign.campaign_id} não existe, desabilitando sync`);
+      return { metrics: [], breakdowns: [], disable: true, error: false };
+    }
+    console.error(`[${logId}] Erro insights campanha ${campaign.campaign_id}:`, errorText.substring(0, 200));
+    return { metrics: [], breakdowns: [], disable: false, error: true };
+  }
+
+  const { data: insights } = await campaignRes.json();
+
+  if (insights && insights.length > 0) {
+    for (const insight of insights) {
+      // Processar actions
+      let conversions = 0, messages = 0, results = 0, linkClicks = 0, pageViews = 0, initiatedCheckout = 0, purchases = 0;
+      let costPerResult = 0, costPerMessage = 0;
+
+      if (insight.actions && Array.isArray(insight.actions)) {
+        for (const action of insight.actions) {
+          const value = parseInt(action.value || '0');
+          const type = action.action_type;
+
+          // Purchases
+          if (type === 'omni_purchase' || type === 'purchase' || type.includes('purchase')) {
+            purchases += value;
+          }
+          // Conversions (leads, registrations)
+          if (type.includes('lead') || type.includes('complete_registration')) {
+            conversions += value;
+          }
+          // Messages
+          if (type.includes('messaging') || type.includes('contact') || type === 'onsite_conversion.messaging_conversation_started_7d') {
+            messages += value;
+          }
+          // Link clicks
+          if (type === 'link_click') linkClicks += value;
+          // Page views
+          if (type === 'landing_page_view') pageViews += value;
+          // Initiated checkout
+          if (type === 'initiate_checkout' || type.includes('initiate_checkout')) initiatedCheckout += value;
+          
+          // Results
+          if (type.includes('lead') || type === 'link_click' || type.includes('engagement') || type === 'landing_page_view') {
+            results += value;
+          }
+        }
+
+        if (results === 0) {
+          results = conversions > 0 ? conversions : messages > 0 ? messages : purchases;
+        }
+      }
+
+      // Cost per action
+      if (insight.cost_per_action_type && Array.isArray(insight.cost_per_action_type)) {
+        for (const costAction of insight.cost_per_action_type) {
+          const cost = parseFloat(costAction.value || '0');
+          if (costAction.action_type.includes('lead') || costAction.action_type === 'link_click') {
+            if (costPerResult === 0) costPerResult = cost;
+          }
+          if (costAction.action_type.includes('messaging')) {
+            if (costPerMessage === 0) costPerMessage = cost;
+          }
+        }
+      }
+
+      if (costPerResult === 0 && results > 0 && insight.spend) {
+        costPerResult = parseFloat(insight.spend) / results;
+      }
+      if (costPerMessage === 0 && messages > 0 && insight.spend) {
+        costPerMessage = parseFloat(insight.spend) / messages;
+      }
+
+      // Video views
+      let videoViews25 = 0, videoViews50 = 0, videoViews75 = 0, videoViews100 = 0;
+      if (insight.video_p25_watched_actions) {
+        videoViews25 = insight.video_p25_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
+      }
+      if (insight.video_p50_watched_actions) {
+        videoViews50 = insight.video_p50_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
+      }
+      if (insight.video_p75_watched_actions) {
+        videoViews75 = insight.video_p75_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
+      }
+      if (insight.video_p100_watched_actions) {
+        videoViews100 = insight.video_p100_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
+      }
+
+      const adIdFromInsight = (insight as any).ad_id as string | undefined;
+      const internalAdId = adIdFromInsight ? adIdMap.get(adIdFromInsight) || null : null;
+
+      metrics.push({
+        campaign_id: campaign.id,
+        ad_id: internalAdId,
+        date: insight.date_start,
+        impressions: parseInt(insight.impressions) || 0,
+        clicks: parseInt(insight.clicks) || 0,
+        spend: parseFloat(insight.spend) || 0,
+        conversions: conversions || 0,
+        ctr: parseFloat(insight.ctr) || 0,
+        cpc: parseFloat(insight.cpc) || 0,
+        link_clicks: linkClicks || 0,
+        page_views: pageViews || 0,
+        initiated_checkout: initiatedCheckout || 0,
+        purchases: purchases || 0,
+        results: results || 0,
+        messages: messages || 0,
+        cost_per_result: costPerResult || 0,
+        cost_per_message: costPerMessage || 0,
+        video_views_25: videoViews25,
+        video_views_50: videoViews50,
+        video_views_75: videoViews75,
+        video_views_100: videoViews100,
+      });
+    }
+
+    // Buscar breakdowns em paralelo
+    const demographicFields = 'date_start,impressions,clicks,spend,actions';
+    
+    const breakdownPromises = [
+      // Age breakdown
+      fetch(`https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=campaign&fields=${demographicFields}&time_range=${timeRange}&breakdowns=age&time_increment=1&access_token=${accessToken}`, { signal })
+        .then(async res => ({ type: 'age', data: res.ok ? (await res.json()).data : null }))
+        .catch(() => ({ type: 'age', data: null })),
+      // Gender breakdown
+      fetch(`https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=campaign&fields=${demographicFields}&time_range=${timeRange}&breakdowns=gender&time_increment=1&access_token=${accessToken}`, { signal })
+        .then(async res => ({ type: 'gender', data: res.ok ? (await res.json()).data : null }))
+        .catch(() => ({ type: 'gender', data: null })),
+      // Region breakdown
+      fetch(`https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=campaign&fields=${demographicFields}&time_range=${timeRange}&breakdowns=region&time_increment=1&access_token=${accessToken}`, { signal })
+        .then(async res => ({ type: 'region', data: res.ok ? (await res.json()).data : null }))
+        .catch(() => ({ type: 'region', data: null })),
+    ];
+
+    const breakdownResults = await Promise.all(breakdownPromises);
+
+    for (const result of breakdownResults) {
+      if (!result.data) continue;
+      
+      for (const item of result.data) {
+        // Extrair conversões das actions
+        let itemConversions = 0;
+        if (item.actions && Array.isArray(item.actions)) {
+          for (const action of item.actions) {
+            const type = action.action_type;
+            if (type.includes('purchase') || type.includes('conversion') || type.includes('lead')) {
+              itemConversions += parseInt(action.value || '0');
+            }
+          }
+        }
+        
+        const breakdownValue = item[result.type] || item.age || item.gender || item.region || 'unknown';
+        
+        breakdowns.push({
+          campaign_id: campaign.id,
+          date: item.date_start,
+          breakdown_type: result.type,
+          breakdown_value: breakdownValue,
+          impressions: parseInt(item.impressions) || 0,
+          clicks: parseInt(item.clicks) || 0,
+          spend: parseFloat(item.spend) || 0,
+          conversions: itemConversions,
+        });
+      }
+    }
+  }
+
+  return { metrics, breakdowns, disable: false, error: false };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,6 +253,7 @@ serve(async (req) => {
 
   const logId = crypto.randomUUID();
   const startedAt = new Date();
+  const MAX_EXECUTION_TIME = 50000; // 50 seconds max
 
   try {
     const authHeader = req.headers.get('Authorization')!;
@@ -83,7 +299,7 @@ serve(async (req) => {
 
     const accessToken = await getValidAccessToken(supabaseClient, integration.id);
 
-    // Buscar campanhas ativas com sync_enabled, PRIORIZANDO por conta e status
+    // Buscar campanhas ativas com sync_enabled
     const { data: campaigns, error: campaignsError } = await supabaseClient
       .from('campaigns')
       .select(`
@@ -144,256 +360,49 @@ serve(async (req) => {
     const allBreakdowns: any[] = [];
     const campaignsToDisable: string[] = [];
     let errors = 0;
+    let processedCampaigns = 0;
 
     const date30DaysAgo = new Date();
     date30DaysAgo.setDate(date30DaysAgo.getDate() - 30);
     const since = date30DaysAgo.toISOString().split('T')[0];
     const until = new Date().toISOString().split('T')[0];
 
-    for (const campaign of campaigns) {
-      try {
-        const fields = 'date_start,impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr,cpc,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
-        const timeRange = `{"since":"${since}","until":"${until}"}`;
+    // Processar campanhas em lotes de 5 para evitar rate limiting
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < campaigns.length; i += BATCH_SIZE) {
+      // Verificar timeout
+      if (Date.now() - startedAt.getTime() > MAX_EXECUTION_TIME) {
+        console.warn(`[${logId}] Timeout atingido após ${processedCampaigns} campanhas`);
+        break;
+      }
 
-        // Buscar insights da campanha em nível de ANÚNCIO (ad)
-        const campaignUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=ad&fields=${fields}&time_range=${timeRange}&time_increment=1&access_token=${accessToken}`;
-        const campaignRes = await fetch(campaignUrl);
+      const batch = campaigns.slice(i, i + BATCH_SIZE);
+      
+      const batchResults = await Promise.all(
+        batch.map(campaign => 
+          processCampaignWithTimeout(campaign, accessToken, since, until, adIdMap, logId)
+        )
+      );
 
-        if (!campaignRes.ok) {
-          const errorText = await campaignRes.text();
-          if (errorText.includes('"code":100') || errorText.includes('does not exist')) {
-            console.warn(`[${logId}] Campanha ${campaign.campaign_id} não existe, desabilitando sync`);
-            campaignsToDisable.push(campaign.id);
-            continue;
-          }
-          console.error(`[${logId}] Erro insights campanha ${campaign.campaign_id}:`, errorText.substring(0, 200));
+      for (const result of batchResults) {
+        processedCampaigns++;
+        if (result.disable) {
+          campaignsToDisable.push(batch[batchResults.indexOf(result)].id);
+        }
+        if (result.error) {
           errors++;
-          continue;
         }
+        allMetrics.push(...result.metrics);
+        allBreakdowns.push(...result.breakdowns);
+      }
 
-        const { data: insights } = await campaignRes.json();
-
-        if (insights && insights.length > 0) {
-          for (const insight of insights) {
-            // Processar actions
-            let conversions = 0, messages = 0, results = 0, linkClicks = 0, pageViews = 0, initiatedCheckout = 0;
-            let costPerResult = 0, costPerMessage = 0;
-
-            if (insight.actions && Array.isArray(insight.actions)) {
-              for (const action of insight.actions) {
-                const value = parseInt(action.value || '0');
-                const type = action.action_type;
-
-                if (type.includes('purchase') || type.includes('conversion') || type.includes('lead') || type.includes('complete_registration')) {
-                  conversions += value;
-                }
-                if (type.includes('messaging') || type.includes('contact')) {
-                  messages += value;
-                }
-                if (type === 'link_click') linkClicks += value;
-                if (type === 'landing_page_view') pageViews += value;
-                if (type === 'initiate_checkout' || type.includes('initiate_checkout')) initiatedCheckout += value;
-                
-                // Results
-                if (type.includes('lead') || type === 'link_click' || type.includes('engagement') || type === 'landing_page_view') {
-                  results += value;
-                }
-              }
-
-              if (results === 0) {
-                results = conversions > 0 ? conversions : messages > 0 ? messages : 0;
-              }
-            }
-
-            // Cost per action
-            if (insight.cost_per_action_type && Array.isArray(insight.cost_per_action_type)) {
-              for (const costAction of insight.cost_per_action_type) {
-                const cost = parseFloat(costAction.value || '0');
-                if (costAction.action_type.includes('lead') || costAction.action_type === 'link_click') {
-                  if (costPerResult === 0) costPerResult = cost;
-                }
-                if (costAction.action_type.includes('messaging')) {
-                  if (costPerMessage === 0) costPerMessage = cost;
-                }
-              }
-            }
-
-            if (costPerResult === 0 && results > 0 && insight.spend) {
-              costPerResult = parseFloat(insight.spend) / results;
-            }
-            if (costPerMessage === 0 && messages > 0 && insight.spend) {
-              costPerMessage = parseFloat(insight.spend) / messages;
-            }
-
-            // Video views
-            let videoViews25 = 0, videoViews50 = 0, videoViews75 = 0, videoViews100 = 0;
-            if (insight.video_p25_watched_actions) {
-              videoViews25 = insight.video_p25_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
-            }
-            if (insight.video_p50_watched_actions) {
-              videoViews50 = insight.video_p50_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
-            }
-            if (insight.video_p75_watched_actions) {
-              videoViews75 = insight.video_p75_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
-            }
-            if (insight.video_p100_watched_actions) {
-              videoViews100 = insight.video_p100_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
-            }
-
-            const adIdFromInsight = (insight as any).ad_id as string | undefined;
-            const internalAdId = adIdFromInsight ? adIdMap.get(adIdFromInsight) || null : null;
-            
-            // Log para debug se não encontrar match
-            if (adIdFromInsight && !internalAdId) {
-              console.log(`[${logId}] Métrica com ad_id=${adIdFromInsight} não encontrou correspondência no banco`);
-            }
-
-            allMetrics.push({
-              campaign_id: campaign.id,
-              ad_id: internalAdId,
-              date: insight.date_start,
-              impressions: parseInt(insight.impressions) || 0,
-              clicks: parseInt(insight.clicks) || 0,
-              spend: parseFloat(insight.spend) || 0,
-              conversions: conversions || 0,
-              ctr: parseFloat(insight.ctr) || 0,
-              cpc: parseFloat(insight.cpc) || 0,
-              link_clicks: linkClicks || 0,
-              page_views: pageViews || 0,
-              initiated_checkout: initiatedCheckout || 0,
-              purchases: conversions || 0,
-              results: results || 0,
-              messages: messages || 0,
-              cost_per_result: costPerResult || 0,
-              cost_per_message: costPerMessage || 0,
-              video_views_25: videoViews25,
-              video_views_50: videoViews50,
-              video_views_75: videoViews75,
-              video_views_100: videoViews100,
-            });
-          }
-
-          // Buscar breakdowns demográficos
-          const demographicFields = 'date_start,impressions,clicks,spend,actions';
-          
-          // Age breakdown
-          try {
-            const ageUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=campaign&fields=${demographicFields}&time_range=${timeRange}&breakdowns=age&time_increment=1&access_token=${accessToken}`;
-            const ageRes = await fetch(ageUrl);
-            if (ageRes.ok) {
-              const { data: ageData } = await ageRes.json();
-              if (ageData) {
-                for (const item of ageData) {
-                  // Extrair conversões das actions
-                  let conversions = 0;
-                  if (item.actions && Array.isArray(item.actions)) {
-                    for (const action of item.actions) {
-                      const type = action.action_type;
-                      if (type.includes('purchase') || type.includes('conversion') || type.includes('lead')) {
-                        conversions += parseInt(action.value || '0');
-                      }
-                    }
-                  }
-                  
-                  allBreakdowns.push({
-                    campaign_id: campaign.id,
-                    date: item.date_start,
-                    breakdown_type: 'age',
-                    breakdown_value: item.age || 'unknown',
-                    impressions: parseInt(item.impressions) || 0,
-                    clicks: parseInt(item.clicks) || 0,
-                    spend: parseFloat(item.spend) || 0,
-                    conversions: conversions,
-                  });
-                }
-              }
-            }
-          } catch (e) {
-            console.error(`[${logId}] Erro ao buscar breakdown de idade:`, e);
-          }
-
-          // Gender breakdown
-          try {
-            const genderUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=campaign&fields=${demographicFields}&time_range=${timeRange}&breakdowns=gender&time_increment=1&access_token=${accessToken}`;
-            const genderRes = await fetch(genderUrl);
-            if (genderRes.ok) {
-              const { data: genderData } = await genderRes.json();
-              if (genderData) {
-                for (const item of genderData) {
-                  // Extrair conversões das actions
-                  let conversions = 0;
-                  if (item.actions && Array.isArray(item.actions)) {
-                    for (const action of item.actions) {
-                      const type = action.action_type;
-                      if (type.includes('purchase') || type.includes('conversion') || type.includes('lead')) {
-                        conversions += parseInt(action.value || '0');
-                      }
-                    }
-                  }
-                  
-                  allBreakdowns.push({
-                    campaign_id: campaign.id,
-                    date: item.date_start,
-                    breakdown_type: 'gender',
-                    breakdown_value: item.gender || 'unknown',
-                    impressions: parseInt(item.impressions) || 0,
-                    clicks: parseInt(item.clicks) || 0,
-                    spend: parseFloat(item.spend) || 0,
-                    conversions: conversions,
-                  });
-                }
-              }
-            }
-          } catch (e) {
-            console.error(`[${logId}] Erro ao buscar breakdown de gênero:`, e);
-          }
-
-          // Region breakdown
-          try {
-            const regionUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=campaign&fields=${demographicFields}&time_range=${timeRange}&breakdowns=region&time_increment=1&access_token=${accessToken}`;
-            const regionRes = await fetch(regionUrl);
-            if (regionRes.ok) {
-              const { data: regionData } = await regionRes.json();
-              if (regionData) {
-                for (const item of regionData) {
-                  // Extrair conversões das actions
-                  let conversions = 0;
-                  if (item.actions && Array.isArray(item.actions)) {
-                    for (const action of item.actions) {
-                      const type = action.action_type;
-                      if (type.includes('purchase') || type.includes('conversion') || type.includes('lead')) {
-                        conversions += parseInt(action.value || '0');
-                      }
-                    }
-                  }
-                  
-                  allBreakdowns.push({
-                    campaign_id: campaign.id,
-                    date: item.date_start,
-                    breakdown_type: 'region',
-                    breakdown_value: item.region || 'unknown',
-                    impressions: parseInt(item.impressions) || 0,
-                    clicks: parseInt(item.clicks) || 0,
-                    spend: parseFloat(item.spend) || 0,
-                    conversions: conversions,
-                  });
-                }
-              }
-            }
-          } catch (e) {
-            console.error(`[${logId}] Erro ao buscar breakdown de região:`, e);
-          }
-        }
-
-        // Delay entre campanhas
-        await delay(100);
-      } catch (error) {
-        console.error(`[${logId}] Erro ao processar campanha ${campaign.campaign_id}:`, error);
-        errors++;
+      // Pequeno delay entre lotes para evitar rate limiting
+      if (i + BATCH_SIZE < campaigns.length) {
+        await delay(200);
       }
     }
 
-    console.log(`[${logId}] Total: ${allMetrics.length} métricas, ${allBreakdowns.length} breakdowns coletados`);
+    console.log(`[${logId}] Total: ${allMetrics.length} métricas, ${allBreakdowns.length} breakdowns coletados de ${processedCampaigns} campanhas`);
 
     // Desabilitar campanhas inexistentes
     if (campaignsToDisable.length > 0) {
@@ -435,6 +444,7 @@ serve(async (req) => {
       status: 'success',
       finished_at: new Date().toISOString(),
       metrics_synced: metricsSynced,
+      campaigns_synced: processedCampaigns,
       error_message: errors > 0 ? `${errors} erros, ${campaignsToDisable.length} campanhas desabilitadas` : null,
     }).eq('id', logId);
 
@@ -445,6 +455,7 @@ serve(async (req) => {
         success: true,
         metricsSynced,
         breakdownsSynced,
+        campaignsProcessed: processedCampaigns,
         campaignsDisabled: campaignsToDisable.length,
         errors,
         message: `${metricsSynced} métricas e ${breakdownsSynced} breakdowns sincronizados.`,
