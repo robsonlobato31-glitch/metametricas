@@ -10,24 +10,68 @@ const corsHeaders = {
 // Helper para delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Helper para batch insert com tratamento de erros
-async function batchInsert(
+// Helper para batch upsert com tratamento de erros
+async function batchUpsertMetrics(
   supabaseClient: any,
-  table: string,
   data: any[],
   batchSize = 50
 ) {
-  let insertedCount = 0;
+  let upsertedCount = 0;
   for (let i = 0; i < data.length; i += batchSize) {
     const batch = data.slice(i, i + batchSize);
-    const { error, data: result } = await supabaseClient.from(table).insert(batch).select('id');
+    const { error, data: result } = await supabaseClient
+      .from('metrics')
+      .upsert(batch, { 
+        onConflict: 'campaign_id,date,ad_id',
+        ignoreDuplicates: false 
+      })
+      .select('id');
     if (error) {
-      console.error(`Erro no batch insert para tabela ${table}:`, error.message);
+      console.error(`Erro no upsert metrics:`, error.message);
+      // Fallback: tentar insert individual para cada item
+      for (const item of batch) {
+        const { error: singleError } = await supabaseClient
+          .from('metrics')
+          .upsert(item, { onConflict: 'campaign_id,date,ad_id' });
+        if (!singleError) upsertedCount++;
+      }
     } else {
-      insertedCount += result?.length || batch.length;
+      upsertedCount += result?.length || batch.length;
     }
   }
-  return insertedCount;
+  return upsertedCount;
+}
+
+// Helper para batch upsert de breakdowns
+async function batchUpsertBreakdowns(
+  supabaseClient: any,
+  data: any[],
+  batchSize = 50
+) {
+  let upsertedCount = 0;
+  for (let i = 0; i < data.length; i += batchSize) {
+    const batch = data.slice(i, i + batchSize);
+    const { error, data: result } = await supabaseClient
+      .from('metric_breakdowns')
+      .upsert(batch, { 
+        onConflict: 'campaign_id,date,breakdown_type,breakdown_value',
+        ignoreDuplicates: false 
+      })
+      .select('id');
+    if (error) {
+      console.error(`Erro no upsert breakdowns:`, error.message);
+      // Fallback: tentar insert individual
+      for (const item of batch) {
+        const { error: singleError } = await supabaseClient
+          .from('metric_breakdowns')
+          .upsert(item, { onConflict: 'campaign_id,date,breakdown_type,breakdown_value' });
+        if (!singleError) upsertedCount++;
+      }
+    } else {
+      upsertedCount += result?.length || batch.length;
+    }
+  }
+  return upsertedCount;
 }
 
 // Processar uma campanha com timeout
@@ -410,34 +454,18 @@ serve(async (req) => {
       await supabaseClient.from('campaigns').update({ sync_enabled: false }).in('id', campaignsToDisable);
     }
 
-    // Deletar métricas antigas e inserir novas
-    const dateStr = since;
+    // UPSERT métricas (sem deletar antes)
     let metricsSynced = 0;
-
     if (allMetrics.length > 0) {
-      const uniqueCampaignIds = [...new Set(allMetrics.map(m => m.campaign_id))];
-
-      // Deletar em chunks
-      for (let i = 0; i < uniqueCampaignIds.length; i += 20) {
-        const batchIds = uniqueCampaignIds.slice(i, i + 20);
-        await supabaseClient.from('metrics').delete().in('campaign_id', batchIds).gte('date', dateStr);
-      }
-
-      // Inserir novas métricas
-      metricsSynced = await batchInsert(supabaseClient, 'metrics', allMetrics);
+      console.log(`[${logId}] Fazendo upsert de ${allMetrics.length} métricas...`);
+      metricsSynced = await batchUpsertMetrics(supabaseClient, allMetrics);
     }
 
-    // Processar breakdowns
+    // UPSERT breakdowns (sem deletar antes)
     let breakdownsSynced = 0;
     if (allBreakdowns.length > 0) {
-      const uniqueCampaignIds = [...new Set(allBreakdowns.map(b => b.campaign_id))];
-
-      for (let i = 0; i < uniqueCampaignIds.length; i += 20) {
-        const batchIds = uniqueCampaignIds.slice(i, i + 20);
-        await supabaseClient.from('metric_breakdowns').delete().in('campaign_id', batchIds).gte('date', dateStr);
-      }
-
-      breakdownsSynced = await batchInsert(supabaseClient, 'metric_breakdowns', allBreakdowns);
+      console.log(`[${logId}] Fazendo upsert de ${allBreakdowns.length} breakdowns...`);
+      breakdownsSynced = await batchUpsertBreakdowns(supabaseClient, allBreakdowns);
     }
 
     await supabaseClient.from('sync_logs').update({
@@ -458,27 +486,18 @@ serve(async (req) => {
         campaignsProcessed: processedCampaigns,
         campaignsDisabled: campaignsToDisable.length,
         errors,
-        message: `${metricsSynced} métricas e ${breakdownsSynced} breakdowns sincronizados.`,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error: any) {
-    console.error(`[${logId}] Erro:`, error);
-
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
-    await supabaseClient.from('sync_logs').update({
-      status: 'error',
-      finished_at: new Date().toISOString(),
-      error_message: error.message,
-    }).eq('id', logId);
+    console.error(`[${logId}] Erro na sincronização:`, error);
 
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        metricsSynced: 0,
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

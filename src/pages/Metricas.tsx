@@ -280,46 +280,38 @@ export default function Metricas() {
     }));
   }, [campaignsData]);
 
-  // Funnel Data - Real Conversion Funnel (moved above early returns to follow hooks rules)
+  // Funnel Data - Visão Geral metrics (moved above early returns to follow hooks rules)
   const funnelData: FunnelStep[] = useMemo(() => {
-    const impressions = funnelMetrics?.impressions || totals.impressions;
-    const linkClicks = funnelMetrics?.linkClicks || totals.link_clicks;
-    const pageViews = funnelMetrics?.pageViews || totals.page_views;
-    const initiatedCheckout = funnelMetrics?.initiatedCheckout || totals.initiated_checkout;
-    const purchases = funnelMetrics?.purchases || totals.purchases;
-
     return [
       {
-        label: 'Impressões',
-        value: formatNumber(impressions),
-        subLabel: 'Alcance total',
+        label: 'Orçamento',
+        value: formatCurrency(totals.budget),
+        subLabel: 'Total disponível',
       },
       {
-        label: 'Cliques',
-        value: formatNumber(linkClicks),
-        subLabel: 'Cliques no link',
-        percent: impressions > 0 ? `${((linkClicks / impressions) * 100).toFixed(2)}%` : '0%',
+        label: 'Mensagens',
+        value: formatNumber(totals.messages),
+        subLabel: 'Conversas iniciadas',
+        percent: totals.budget > 0 ? `${((totals.spend / totals.budget) * 100).toFixed(1)}% gasto` : '0%',
       },
       {
-        label: 'Páginas',
-        value: formatNumber(pageViews),
-        subLabel: 'Visualizações',
-        percent: linkClicks > 0 ? `${((pageViews / linkClicks) * 100).toFixed(2)}%` : '0%',
+        label: 'Custo/Msg',
+        value: formatCurrency(totals.cost_per_message),
+        subLabel: 'Custo médio',
       },
       {
-        label: 'Checkout',
-        value: formatNumber(initiatedCheckout),
-        subLabel: 'Iniciaram checkout',
-        percent: pageViews > 0 ? `${((initiatedCheckout / pageViews) * 100).toFixed(2)}%` : '0%',
+        label: 'Gasto',
+        value: formatCurrency(totals.spend),
+        subLabel: 'Total investido',
+        percent: totals.budget > 0 ? `${((totals.spend / totals.budget) * 100).toFixed(1)}%` : '0%',
       },
       {
-        label: 'Compras',
-        value: formatNumber(purchases),
-        subLabel: 'Conversões finais',
-        percent: initiatedCheckout > 0 ? `${((purchases / initiatedCheckout) * 100).toFixed(2)}%` : '0%',
+        label: 'CTR',
+        value: `${totals.ctr.toFixed(2)}%`,
+        subLabel: 'Taxa de cliques',
       },
     ];
-  }, [funnelMetrics, totals]);
+  }, [totals]);
 
   // Show loading state
   if (isLoading) {
