@@ -280,6 +280,47 @@ export default function Metricas() {
     }));
   }, [campaignsData]);
 
+  // Funnel Data - Real Conversion Funnel (moved above early returns to follow hooks rules)
+  const funnelData: FunnelStep[] = useMemo(() => {
+    const impressions = funnelMetrics?.impressions || totals.impressions;
+    const linkClicks = funnelMetrics?.linkClicks || totals.link_clicks;
+    const pageViews = funnelMetrics?.pageViews || totals.page_views;
+    const initiatedCheckout = funnelMetrics?.initiatedCheckout || totals.initiated_checkout;
+    const purchases = funnelMetrics?.purchases || totals.purchases;
+
+    return [
+      {
+        label: 'Impressões',
+        value: formatNumber(impressions),
+        subLabel: 'Alcance total',
+      },
+      {
+        label: 'Cliques',
+        value: formatNumber(linkClicks),
+        subLabel: 'Cliques no link',
+        percent: impressions > 0 ? `${((linkClicks / impressions) * 100).toFixed(2)}%` : '0%',
+      },
+      {
+        label: 'Páginas',
+        value: formatNumber(pageViews),
+        subLabel: 'Visualizações',
+        percent: linkClicks > 0 ? `${((pageViews / linkClicks) * 100).toFixed(2)}%` : '0%',
+      },
+      {
+        label: 'Checkout',
+        value: formatNumber(initiatedCheckout),
+        subLabel: 'Iniciaram checkout',
+        percent: pageViews > 0 ? `${((initiatedCheckout / pageViews) * 100).toFixed(2)}%` : '0%',
+      },
+      {
+        label: 'Compras',
+        value: formatNumber(purchases),
+        subLabel: 'Conversões finais',
+        percent: initiatedCheckout > 0 ? `${((purchases / initiatedCheckout) * 100).toFixed(2)}%` : '0%',
+      },
+    ];
+  }, [funnelMetrics, totals]);
+
   // Show loading state
   if (isLoading) {
     return (
@@ -363,47 +404,6 @@ export default function Metricas() {
     { label: 'CTR', value: `${totals.ctr.toFixed(2)}%`, icon: Percent },
     { label: 'CPM', value: formatCurrency(totals.cpm), icon: Eye },
   ];
-
-  // Funnel Data - Real Conversion Funnel
-  const funnelData: FunnelStep[] = useMemo(() => {
-    const impressions = funnelMetrics?.impressions || totals.impressions;
-    const linkClicks = funnelMetrics?.linkClicks || totals.link_clicks;
-    const pageViews = funnelMetrics?.pageViews || totals.page_views;
-    const initiatedCheckout = funnelMetrics?.initiatedCheckout || totals.initiated_checkout;
-    const purchases = funnelMetrics?.purchases || totals.purchases;
-
-    return [
-      {
-        label: 'Impressões',
-        value: formatNumber(impressions),
-        subLabel: 'Alcance total',
-      },
-      {
-        label: 'Cliques',
-        value: formatNumber(linkClicks),
-        subLabel: 'Cliques no link',
-        percent: impressions > 0 ? `${((linkClicks / impressions) * 100).toFixed(2)}%` : '0%',
-      },
-      {
-        label: 'Páginas',
-        value: formatNumber(pageViews),
-        subLabel: 'Visualizações',
-        percent: linkClicks > 0 ? `${((pageViews / linkClicks) * 100).toFixed(2)}%` : '0%',
-      },
-      {
-        label: 'Checkout',
-        value: formatNumber(initiatedCheckout),
-        subLabel: 'Iniciaram checkout',
-        percent: pageViews > 0 ? `${((initiatedCheckout / pageViews) * 100).toFixed(2)}%` : '0%',
-      },
-      {
-        label: 'Compras',
-        value: formatNumber(purchases),
-        subLabel: 'Conversões finais',
-        percent: initiatedCheckout > 0 ? `${((purchases / initiatedCheckout) * 100).toFixed(2)}%` : '0%',
-      },
-    ];
-  }, [funnelMetrics, totals]);
 
   return (
     <div className="min-h-screen bg-dark-bg text-gray-200 font-sans selection:bg-brand-500/30 overflow-x-hidden">
