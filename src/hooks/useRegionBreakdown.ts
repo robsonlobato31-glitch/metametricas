@@ -11,6 +11,12 @@ export interface RegionMetric {
   conversions: number;
 }
 
+export interface RegionBreakdownResult {
+  regions: RegionMetric[];
+  hasData: boolean;
+  needsSync: boolean;
+}
+
 export const useRegionBreakdown = (
   dateFrom?: Date,
   dateTo?: Date,
@@ -24,8 +30,8 @@ export const useRegionBreakdown = (
 
   return useQuery({
     queryKey: ['region-breakdown', user?.id, dateFromStr, dateToStr, accountId, status],
-    queryFn: async () => {
-      if (!user?.id) return [];
+    queryFn: async (): Promise<RegionBreakdownResult> => {
+      if (!user?.id) return { regions: [], hasData: false, needsSync: false };
 
       // Etapa 1: Buscar integrações do usuário
       const { data: integrations, error: integrationsError } = await supabase
@@ -40,7 +46,7 @@ export const useRegionBreakdown = (
       }
 
       if (!integrations || integrations.length === 0) {
-        return [];
+        return { regions: [], hasData: false, needsSync: false };
       }
 
       const integrationIds = integrations.map(i => i.id);
@@ -60,7 +66,7 @@ export const useRegionBreakdown = (
       }
 
       if (!accounts || accounts.length === 0) {
-        return [];
+        return { regions: [], hasData: false, needsSync: false };
       }
 
       // Filtrar por conta específica se fornecido
@@ -70,7 +76,7 @@ export const useRegionBreakdown = (
       }
 
       if (accountIds.length === 0) {
-        return [];
+        return { regions: [], hasData: false, needsSync: false };
       }
 
       // Etapa 3: Buscar campanhas dessas contas
@@ -91,10 +97,20 @@ export const useRegionBreakdown = (
       }
 
       if (!campaigns || campaigns.length === 0) {
-        return [];
+        return { regions: [], hasData: false, needsSync: false };
       }
 
       const campaignIds = campaigns.map(c => c.id);
+
+      // Verificar se há métricas (para determinar se needsSync)
+      const { count: metricsCount } = await supabase
+        .from('metrics')
+        .select('id', { count: 'exact', head: true })
+        .in('campaign_id', campaignIds)
+        .gte('date', dateFromStr)
+        .lte('date', dateToStr);
+
+      const hasMetrics = (metricsCount || 0) > 0;
 
       // Etapa 4: Buscar os breakdowns de região para essas campanhas
       let breakdownsQuery = supabase
@@ -118,7 +134,7 @@ export const useRegionBreakdown = (
       }
 
       if (!data || data.length === 0) {
-        return [];
+        return { regions: [], hasData: false, needsSync: hasMetrics };
       }
 
       // Agregar dados por região
@@ -148,7 +164,7 @@ export const useRegionBreakdown = (
         .sort((a, b) => b.impressions - a.impressions)
         .slice(0, 10); // Top 10 regiões
 
-      return regions;
+      return { regions, hasData: true, needsSync: false };
     },
     enabled: !!user?.id,
   });

@@ -11,6 +11,13 @@ export interface DemographicMetric {
     conversions: number;
 }
 
+export interface DemographicsResult {
+    age: DemographicMetric[];
+    gender: DemographicMetric[];
+    hasData: boolean;
+    needsSync: boolean;
+}
+
 export const useDemographics = (
     dateFrom?: Date,
     dateTo?: Date,
@@ -24,8 +31,8 @@ export const useDemographics = (
 
     return useQuery({
         queryKey: ['demographics', user?.id, dateFromStr, dateToStr, accountId, status],
-        queryFn: async () => {
-            if (!user?.id) return { age: [], gender: [] };
+        queryFn: async (): Promise<DemographicsResult> => {
+            if (!user?.id) return { age: [], gender: [], hasData: false, needsSync: false };
 
             // Etapa 1: Buscar integrações do usuário
             const { data: integrations, error: integrationsError } = await supabase
@@ -40,7 +47,7 @@ export const useDemographics = (
             }
 
             if (!integrations || integrations.length === 0) {
-                return { age: [], gender: [] };
+                return { age: [], gender: [], hasData: false, needsSync: false };
             }
 
             const integrationIds = integrations.map(i => i.id);
@@ -60,7 +67,7 @@ export const useDemographics = (
             }
 
             if (!accounts || accounts.length === 0) {
-                return { age: [], gender: [] };
+                return { age: [], gender: [], hasData: false, needsSync: false };
             }
 
             // Filtrar por conta específica se fornecido
@@ -70,7 +77,7 @@ export const useDemographics = (
             }
 
             if (accountIds.length === 0) {
-                return { age: [], gender: [] };
+                return { age: [], gender: [], hasData: false, needsSync: false };
             }
 
             // Etapa 3: Buscar campanhas dessas contas
@@ -91,10 +98,20 @@ export const useDemographics = (
             }
 
             if (!campaigns || campaigns.length === 0) {
-                return { age: [], gender: [] };
+                return { age: [], gender: [], hasData: false, needsSync: false };
             }
 
             const campaignIds = campaigns.map(c => c.id);
+
+            // Verificar se há métricas (para determinar se needsSync)
+            const { count: metricsCount } = await supabase
+                .from('metrics')
+                .select('id', { count: 'exact', head: true })
+                .in('campaign_id', campaignIds)
+                .gte('date', dateFromStr)
+                .lte('date', dateToStr);
+
+            const hasMetrics = (metricsCount || 0) > 0;
 
             // Etapa 4: Buscar os breakdowns demográficos para essas campanhas
             let breakdownsQuery = supabase
@@ -118,7 +135,8 @@ export const useDemographics = (
             }
 
             if (!data || data.length === 0) {
-                return { age: [], gender: [] };
+                // Se há métricas mas não há breakdowns, precisa sincronizar
+                return { age: [], gender: [], hasData: false, needsSync: hasMetrics };
             }
 
             // Aggregate data by type and value
@@ -146,10 +164,10 @@ export const useDemographics = (
             }, {});
 
             // Convert to arrays
-            const age = Object.values(aggregated.age || {}).sort((a: any, b: any) => b.impressions - a.impressions);
-            const gender = Object.values(aggregated.gender || {}).sort((a: any, b: any) => b.impressions - a.impressions);
+            const age = Object.values(aggregated.age || {}).sort((a: any, b: any) => b.impressions - a.impressions) as DemographicMetric[];
+            const gender = Object.values(aggregated.gender || {}).sort((a: any, b: any) => b.impressions - a.impressions) as DemographicMetric[];
 
-            return { age, gender };
+            return { age, gender, hasData: true, needsSync: false };
         },
         enabled: !!user?.id,
     });
