@@ -434,7 +434,7 @@ export default function Metricas() {
             {/* Right Column */}
             <div className="col-span-12 md:col-span-6 xl:col-span-4 flex flex-col gap-6">
               <DemographicsChart data={demographicChartData} />
-              <RegionChart data={regionData || []} />
+              <RegionChart data={regionData?.regions || []} />
               {hasVideoData && <VideoFunnel metrics={videoMetrics} />}
               <CreativeTable 
                 creatives={creativeTableData} 
