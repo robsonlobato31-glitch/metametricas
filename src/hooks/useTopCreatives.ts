@@ -105,86 +105,109 @@ export const useTopCreatives = (
                 return { creatives: [], needsSync: true, hasAdsData: false };
             }
 
-            // Step 3: Get campaign-level metrics (since ad_id in metrics table is always null)
-            let metricsQuery = supabase
+            // Step 3: Get ad-level metrics first, fallback to campaign-level
+            const adInternalIds = ads.map(a => a.id);
+            
+            // Buscar métricas por ad_id (métricas diretas de anúncios)
+            let adMetricsQuery = supabase
                 .from('metrics')
-                .select('campaign_id, spend, impressions, clicks, conversions, messages')
-                .in('campaign_id', campaignIds)
+                .select('ad_id, campaign_id, spend, impressions, clicks, conversions, messages')
+                .in('ad_id', adInternalIds)
                 .gte('date', dateFromStr)
                 .lte('date', dateToStr);
 
             if (status === 'WITH_SPEND') {
-                metricsQuery = metricsQuery.gt('spend', 0);
+                adMetricsQuery = adMetricsQuery.gt('spend', 0);
             }
 
-            const { data: metrics, error: metricsError } = await metricsQuery;
+            const { data: adMetrics } = await adMetricsQuery;
 
-            if (metricsError || !metrics || metrics.length === 0) {
-                return { creatives: [], needsSync: false, hasAdsData: true };
-            }
-
-            // Step 4: Aggregate metrics by campaign
-            const campaignMetrics: Record<string, { spend: number; impressions: number; clicks: number; conversions: number; messages: number }> = {};
+            // Agregar métricas por anúncio
+            const adMetricsMap: Record<string, { spend: number; impressions: number; clicks: number; conversions: number; messages: number }> = {};
             
-            for (const metric of metrics) {
-                if (!metric.campaign_id) continue;
-                
-                if (!campaignMetrics[metric.campaign_id]) {
-                    campaignMetrics[metric.campaign_id] = { spend: 0, impressions: 0, clicks: 0, conversions: 0, messages: 0 };
+            if (adMetrics && adMetrics.length > 0) {
+                for (const metric of adMetrics) {
+                    if (!metric.ad_id) continue;
+                    
+                    if (!adMetricsMap[metric.ad_id]) {
+                        adMetricsMap[metric.ad_id] = { spend: 0, impressions: 0, clicks: 0, conversions: 0, messages: 0 };
+                    }
+                    
+                    adMetricsMap[metric.ad_id].spend += Number(metric.spend || 0);
+                    adMetricsMap[metric.ad_id].impressions += Number(metric.impressions || 0);
+                    adMetricsMap[metric.ad_id].clicks += Number(metric.clicks || 0);
+                    adMetricsMap[metric.ad_id].conversions += Number(metric.conversions || 0);
+                    adMetricsMap[metric.ad_id].messages += Number(metric.messages || 0);
                 }
-                
-                campaignMetrics[metric.campaign_id].spend += Number(metric.spend || 0);
-                campaignMetrics[metric.campaign_id].impressions += Number(metric.impressions || 0);
-                campaignMetrics[metric.campaign_id].clicks += Number(metric.clicks || 0);
-                campaignMetrics[metric.campaign_id].conversions += Number(metric.conversions || 0);
-                campaignMetrics[metric.campaign_id].messages += Number(metric.messages || 0);
             }
 
-            // Step 5: Distribute campaign metrics proportionally among ads
-            // Group ads by campaign
-            const adsByCampaign: Record<string, any[]> = {};
-            for (const ad of ads) {
-                const campaignId = adSetToCampaign.get(ad.ad_set_id);
-                if (!campaignId) continue;
-                
-                if (!adsByCampaign[campaignId]) {
-                    adsByCampaign[campaignId] = [];
-                }
-                adsByCampaign[campaignId].push(ad);
-            }
+            // Verificar se temos métricas por anúncio
+            const hasAdLevelMetrics = Object.keys(adMetricsMap).length > 0;
 
-            // Build creatives list with distributed metrics
+            // Build creatives list com métricas diretas dos anúncios
             const creatives: CreativeMetric[] = [];
 
-            for (const [cmpId, cmpAds] of Object.entries(adsByCampaign)) {
-                const cmpMetric = campaignMetrics[cmpId];
-                if (!cmpMetric) continue;
+            if (hasAdLevelMetrics) {
+                // Usar métricas diretas por anúncio
+                for (const ad of ads) {
+                    const adMetric = adMetricsMap[ad.id];
+                    if (!adMetric) continue; // Pular anúncios sem métricas
 
-                // Distribute metrics equally among ads in the campaign
-                const adCount = cmpAds.length;
-                const perAdSpend = cmpMetric.spend / adCount;
-                const perAdImpressions = Math.round(cmpMetric.impressions / adCount);
-                const perAdClicks = Math.round(cmpMetric.clicks / adCount);
-                const perAdConversions = Math.round(cmpMetric.conversions / adCount);
-                const perAdMessages = Math.round(cmpMetric.messages / adCount);
-
-                for (const ad of cmpAds) {
                     creatives.push({
                         ad_id: ad.ad_id,
                         ad_name: ad.name,
                         creative_url: ad.creative_url,
-                        spend: perAdSpend,
-                        impressions: perAdImpressions,
-                        clicks: perAdClicks,
-                        conversions: perAdConversions,
-                        messages: perAdMessages,
-                        ctr: perAdImpressions > 0 ? (perAdClicks / perAdImpressions) * 100 : 0,
-                        cpc: perAdClicks > 0 ? perAdSpend / perAdClicks : 0,
-                        cpa: perAdConversions > 0 ? perAdSpend / perAdConversions : 0,
+                        spend: adMetric.spend,
+                        impressions: adMetric.impressions,
+                        clicks: adMetric.clicks,
+                        conversions: adMetric.conversions,
+                        messages: adMetric.messages,
+                        ctr: adMetric.impressions > 0 ? (adMetric.clicks / adMetric.impressions) * 100 : 0,
+                        cpc: adMetric.clicks > 0 ? adMetric.spend / adMetric.clicks : 0,
+                        cpa: adMetric.conversions > 0 ? adMetric.spend / adMetric.conversions : 0,
                         roas: 0,
-                        cost_per_message: perAdMessages > 0 ? perAdSpend / perAdMessages : 0,
+                        cost_per_message: adMetric.messages > 0 ? adMetric.spend / adMetric.messages : 0,
                     });
                 }
+            } else {
+                // Fallback: métricas de campanha (quando ad_id é null)
+                let campaignMetricsQuery = supabase
+                    .from('metrics')
+                    .select('campaign_id, spend, impressions, clicks, conversions, messages')
+                    .in('campaign_id', campaignIds)
+                    .is('ad_id', null)
+                    .gte('date', dateFromStr)
+                    .lte('date', dateToStr);
+
+                if (status === 'WITH_SPEND') {
+                    campaignMetricsQuery = campaignMetricsQuery.gt('spend', 0);
+                }
+
+                const { data: campaignMetrics } = await campaignMetricsQuery;
+
+                if (!campaignMetrics || campaignMetrics.length === 0) {
+                    return { creatives: [], needsSync: true, hasAdsData: true };
+                }
+
+                // Agregar métricas por campanha
+                const campaignMetricsAgg: Record<string, { spend: number; impressions: number; clicks: number; conversions: number; messages: number }> = {};
+                
+                for (const metric of campaignMetrics) {
+                    if (!metric.campaign_id) continue;
+                    
+                    if (!campaignMetricsAgg[metric.campaign_id]) {
+                        campaignMetricsAgg[metric.campaign_id] = { spend: 0, impressions: 0, clicks: 0, conversions: 0, messages: 0 };
+                    }
+                    
+                    campaignMetricsAgg[metric.campaign_id].spend += Number(metric.spend || 0);
+                    campaignMetricsAgg[metric.campaign_id].impressions += Number(metric.impressions || 0);
+                    campaignMetricsAgg[metric.campaign_id].clicks += Number(metric.clicks || 0);
+                    campaignMetricsAgg[metric.campaign_id].conversions += Number(metric.conversions || 0);
+                    campaignMetricsAgg[metric.campaign_id].messages += Number(metric.messages || 0);
+                }
+
+                // Mostrar mensagem indicando que precisa sincronizar para ter métricas por anúncio
+                return { creatives: [], needsSync: true, hasAdsData: true };
             }
 
             // Sort by spend and take top 5
