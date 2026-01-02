@@ -76,11 +76,12 @@ async function processCampaign(
   const metrics: any[] = [];
   const breakdowns: any[] = [];
   
-  const fields = 'date_start,impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr,cpc,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
+  // IMPORTANTE: Incluir ad_id nos fields para capturar métricas por anúncio
+  const fields = 'ad_id,ad_name,date_start,impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr,cpc,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
   const timeRange = `{"since":"${since}","until":"${until}"}`;
 
   try {
-    // Buscar insights em nível de AD
+    // Buscar insights em nível de AD (inclui ad_id nos dados retornados)
     const campaignUrl = `https://graph.facebook.com/v18.0/${campaign.campaign_id}/insights?level=ad&fields=${fields}&time_range=${timeRange}&time_increment=1&access_token=${accessToken}`;
     const campaignRes = await fetch(campaignUrl);
 
@@ -153,8 +154,11 @@ async function processCampaign(
           videoViews100 = insight.video_p100_watched_actions.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
         }
 
-        const adIdFromInsight = (insight as any).ad_id as string | undefined;
+        // Capturar ad_id da resposta da API (agora vem como campo porque incluímos nos fields)
+        const adIdFromInsight = insight.ad_id as string | undefined;
         const internalAdId = adIdFromInsight ? adIdMap.get(adIdFromInsight) || null : null;
+        
+        console.log(`[${logId}] Insight ad_id: ${adIdFromInsight}, internal_ad_id: ${internalAdId}`);
 
         metrics.push({
           campaign_id: campaign.id,
