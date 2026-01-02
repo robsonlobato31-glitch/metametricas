@@ -203,9 +203,8 @@ export default function Metricas() {
     }));
   }, [topCreatives]);
 
-  // Check if creatives need sync and mode
+  // Check if creatives need sync
   const creativesNeedSync = topCreatives?.needsSync ?? false;
-  const creativesMode = topCreatives?.mode ?? 'campaigns';
 
   // Sync creatives function
   const handleSyncCreatives = async () => {
@@ -441,7 +440,6 @@ export default function Metricas() {
                 needsSync={creativesNeedSync}
                 onSyncClick={handleSyncCreatives}
                 isSyncing={isSyncingCreatives}
-                mode={creativesMode}
                 lastSyncAt={lastMetricsSync?.lastSyncAt}
                 lastSyncLoading={lastSyncLoading}
               />
