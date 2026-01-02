@@ -7,31 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper para batch upsert com tratamento de erros
-async function batchUpsert(
-  supabaseClient: any,
-  table: string,
-  data: any[],
-  onConflict: string,
-  batchSize = 50
-) {
-  let insertedCount = 0;
-  for (let i = 0; i < data.length; i += batchSize) {
-    const batch = data.slice(i, i + batchSize);
-    const { error, data: result } = await supabaseClient
-      .from(table)
-      .upsert(batch, { onConflict, ignoreDuplicates: false })
-      .select('id');
-    
-    if (error) {
-      console.error(`Erro no batch upsert para tabela ${table}:`, error.message);
-    } else {
-      insertedCount += result?.length || batch.length;
-    }
-  }
-  return insertedCount;
-}
-
 // Helper para delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -120,6 +95,7 @@ serve(async (req) => {
     let campaignsSynced = 0;
     let adSetsSynced = 0;
     let adsSynced = 0;
+    const accountsWithoutAccess: string[] = [];
 
     for (const account of allAdAccounts) {
       // Verificar tempo de execução
@@ -131,7 +107,14 @@ serve(async (req) => {
       try {
         const accountId = account.id.replace('act_', '');
 
-        // Upsert conta
+        // Verificar se a conta está ativa (account_status === 1)
+        if (account.account_status !== 1) {
+          console.log(`[${logId}] Conta ${account.name} não está ativa (status: ${account.account_status}), pulando...`);
+          accountsWithoutAccess.push(account.id);
+          continue;
+        }
+
+        // Upsert conta usando account_id como chave única
         const { data: dbAccount, error: accountError } = await supabaseClient
           .from('ad_accounts')
           .upsert({
@@ -140,8 +123,8 @@ serve(async (req) => {
             account_name: account.name,
             provider: 'meta',
             currency: account.currency || 'BRL',
-            is_active: account.account_status === 1,
-          }, { onConflict: 'integration_id,account_id' })
+            is_active: true,
+          }, { onConflict: 'account_id' })
           .select()
           .single();
 
@@ -152,9 +135,9 @@ serve(async (req) => {
 
         accountsSynced++;
 
-        // ===== BUSCAR CAMPANHAS =====
+        // ===== BUSCAR CAMPANHAS (apenas ACTIVE e PAUSED) =====
         let allCampaigns: any[] = [];
-        let campaignsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time&limit=200&access_token=${accessToken}`;
+        let campaignsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=200&access_token=${accessToken}`;
 
         while (campaignsNextUrl) {
           const campaignsResponse: any = await fetch(campaignsNextUrl);
@@ -164,88 +147,94 @@ serve(async (req) => {
             campaignsNextUrl = campaignsData.paging?.next || null;
           } else {
             const errorText = await campaignsResponse.text();
-            console.error(`[${logId}] Erro ao buscar campanhas da conta ${account.id}:`, errorText.substring(0, 200));
+            // Se erro 100 (sem acesso), marcar conta como inativa
+            if (errorText.includes('"code":100') || errorText.includes('does not exist')) {
+              console.warn(`[${logId}] Sem acesso à conta ${account.name}, marcando como inativa`);
+              await supabaseClient.from('ad_accounts').update({ is_active: false }).eq('id', dbAccount.id);
+              accountsWithoutAccess.push(account.id);
+            } else {
+              console.error(`[${logId}] Erro ao buscar campanhas da conta ${account.id}:`, errorText.substring(0, 200));
+            }
             campaignsNextUrl = null;
           }
         }
 
-        console.log(`[${logId}] Conta ${account.name}: ${allCampaigns.length} campanhas`);
+        console.log(`[${logId}] Conta ${account.name}: ${allCampaigns.length} campanhas ativas/pausadas`);
 
-        // Batch upsert campanhas
+        // Upsert campanhas usando campaign_id como chave única
         if (allCampaigns.length > 0) {
-          const campaignsBatch = allCampaigns.map(campaign => ({
-            ad_account_id: dbAccount.id,
-            campaign_id: campaign.id,
-            name: campaign.name,
-            status: campaign.status,
-            objective: campaign.objective,
-            daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : null,
-            lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : null,
-            start_date: campaign.start_time ? new Date(campaign.start_time).toISOString().split('T')[0] : null,
-            end_date: campaign.stop_time ? new Date(campaign.stop_time).toISOString().split('T')[0] : null,
-            sync_enabled: true,
-          }));
+          for (const campaign of allCampaigns) {
+            const { error: campaignError } = await supabaseClient
+              .from('campaigns')
+              .upsert({
+                ad_account_id: dbAccount.id,
+                campaign_id: campaign.id,
+                name: campaign.name,
+                status: campaign.status,
+                objective: campaign.objective,
+                daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : null,
+                lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : null,
+                start_date: campaign.start_time ? new Date(campaign.start_time).toISOString().split('T')[0] : null,
+                end_date: campaign.stop_time ? new Date(campaign.stop_time).toISOString().split('T')[0] : null,
+                sync_enabled: true,
+              }, { onConflict: 'campaign_id' });
 
-          await batchUpsert(supabaseClient, 'campaigns', campaignsBatch, 'ad_account_id,campaign_id');
-          campaignsSynced += allCampaigns.length;
+            if (!campaignError) campaignsSynced++;
+          }
         }
 
         // Buscar campanhas do banco para obter IDs internos
         const { data: dbCampaigns } = await supabaseClient
           .from('campaigns')
           .select('id, campaign_id')
-          .eq('ad_account_id', dbAccount.id);
+          .eq('ad_account_id', dbAccount.id)
+          .eq('sync_enabled', true);
 
         const campaignIdMap = new Map(dbCampaigns?.map(c => [c.campaign_id, c.id]) || []);
 
-        // ===== BUSCAR AD SETS DIRETAMENTE DA CONTA (OTIMIZADO) =====
-        console.log(`[${logId}] Buscando ad sets diretamente da conta ${account.name}...`);
-        
-        let allAdSets: any[] = [];
-        let adSetsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/adsets?fields=id,name,status,campaign_id,optimization_goal,billing_event,bid_amount,daily_budget,lifetime_budget,start_time,end_time,targeting&limit=200&access_token=${accessToken}`;
+        // ===== BUSCAR AD SETS (apenas de campanhas ativas) =====
+        if (campaignIdMap.size > 0) {
+          console.log(`[${logId}] Buscando ad sets da conta ${account.name}...`);
+          
+          let allAdSets: any[] = [];
+          let adSetsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/adsets?fields=id,name,status,campaign_id,optimization_goal,billing_event,bid_amount,daily_budget,lifetime_budget,start_time,end_time,targeting&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=200&access_token=${accessToken}`;
 
-        while (adSetsNextUrl && (Date.now() - startTime < MAX_EXECUTION_TIME)) {
-          const adSetsResponse: Response = await fetch(adSetsNextUrl);
-          if (adSetsResponse.ok) {
-            const adSetsData: any = await adSetsResponse.json();
-            allAdSets = [...allAdSets, ...adSetsData.data];
-            adSetsNextUrl = adSetsData.paging?.next || null;
-          } else {
-            const errorText = await adSetsResponse.text();
-            console.error(`[${logId}] Erro ao buscar ad sets:`, errorText.substring(0, 150));
-            adSetsNextUrl = null;
+          while (adSetsNextUrl && (Date.now() - startTime < MAX_EXECUTION_TIME)) {
+            const adSetsResponse: Response = await fetch(adSetsNextUrl);
+            if (adSetsResponse.ok) {
+              const adSetsData: any = await adSetsResponse.json();
+              allAdSets = [...allAdSets, ...adSetsData.data];
+              adSetsNextUrl = adSetsData.paging?.next || null;
+            } else {
+              adSetsNextUrl = null;
+            }
           }
-        }
 
-        console.log(`[${logId}] Conta ${account.name}: ${allAdSets.length} ad sets encontrados da API`);
-
-        // Batch upsert ad sets
-        if (allAdSets.length > 0) {
+          // Filtrar ad sets que pertencem a campanhas conhecidas
           const filteredAdSets = allAdSets.filter(adSet => campaignIdMap.has(adSet.campaign_id));
-          console.log(`[${logId}] Ad sets filtrados: ${filteredAdSets.length}/${allAdSets.length} (match com campanhas)`);
-          
-          if (filteredAdSets.length === 0 && allAdSets.length > 0) {
-            console.warn(`[${logId}] AVISO: Nenhum ad set correspondeu. Campaign IDs no mapa: ${Array.from(campaignIdMap.keys()).slice(0, 3).join(', ')}`);
-            console.warn(`[${logId}] Ad set campaign_ids: ${allAdSets.slice(0, 3).map((as: any) => as.campaign_id).join(', ')}`);
-          }
-          
-          const adSetsBatch = filteredAdSets.map((adSet: any) => ({
-              campaign_id: campaignIdMap.get(adSet.campaign_id),
-              ad_set_id: adSet.id,
-              name: adSet.name,
-              status: adSet.status,
-              optimization_goal: adSet.optimization_goal,
-              billing_event: adSet.billing_event,
-              bid_amount: adSet.bid_amount ? parseFloat(adSet.bid_amount) / 100 : null,
-              daily_budget: adSet.daily_budget ? parseFloat(adSet.daily_budget) / 100 : null,
-              lifetime_budget: adSet.lifetime_budget ? parseFloat(adSet.lifetime_budget) / 100 : null,
-              start_date: adSet.start_time ? new Date(adSet.start_time).toISOString().split('T')[0] : null,
-              end_date: adSet.end_time ? new Date(adSet.end_time).toISOString().split('T')[0] : null,
-              targeting: adSet.targeting || null,
-            }));
+          console.log(`[${logId}] Conta ${account.name}: ${filteredAdSets.length}/${allAdSets.length} ad sets válidos`);
 
-          const insertedAdSets = await batchUpsert(supabaseClient, 'ad_sets', adSetsBatch, 'campaign_id,ad_set_id');
-          adSetsSynced += insertedAdSets;
+          // Upsert ad sets
+          for (const adSet of filteredAdSets) {
+            const { error: adSetError } = await supabaseClient
+              .from('ad_sets')
+              .upsert({
+                campaign_id: campaignIdMap.get(adSet.campaign_id),
+                ad_set_id: adSet.id,
+                name: adSet.name,
+                status: adSet.status,
+                optimization_goal: adSet.optimization_goal,
+                billing_event: adSet.billing_event,
+                bid_amount: adSet.bid_amount ? parseFloat(adSet.bid_amount) / 100 : null,
+                daily_budget: adSet.daily_budget ? parseFloat(adSet.daily_budget) / 100 : null,
+                lifetime_budget: adSet.lifetime_budget ? parseFloat(adSet.lifetime_budget) / 100 : null,
+                start_date: adSet.start_time ? new Date(adSet.start_time).toISOString().split('T')[0] : null,
+                end_date: adSet.end_time ? new Date(adSet.end_time).toISOString().split('T')[0] : null,
+                targeting: adSet.targeting || null,
+              }, { onConflict: 'campaign_id,ad_set_id' });
+
+            if (!adSetError) adSetsSynced++;
+          }
         }
 
         // Buscar ad sets do banco para obter IDs
@@ -256,51 +245,46 @@ serve(async (req) => {
 
         const adSetIdMap = new Map(dbAdSets?.map(as => [as.ad_set_id, as.id]) || []);
 
-        // ===== BUSCAR ADS DIRETAMENTE DA CONTA (OTIMIZADO) =====
-        console.log(`[${logId}] Buscando ads diretamente da conta ${account.name}...`);
-        
-        let allAds: any[] = [];
-        let adsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/ads?fields=id,name,status,adset_id,creative{id,name,object_type,thumbnail_url,effective_object_story_id}&limit=200&access_token=${accessToken}`;
+        // ===== BUSCAR ADS (apenas ativos) =====
+        if (adSetIdMap.size > 0) {
+          console.log(`[${logId}] Buscando ads da conta ${account.name}...`);
+          
+          let allAds: any[] = [];
+          let adsNextUrl: string | null = `https://graph.facebook.com/v18.0/act_${accountId}/ads?fields=id,name,status,adset_id,creative{id,name,object_type,thumbnail_url}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=200&access_token=${accessToken}`;
 
-        while (adsNextUrl && (Date.now() - startTime < MAX_EXECUTION_TIME)) {
-          const adsResponse: Response = await fetch(adsNextUrl);
-          if (adsResponse.ok) {
-            const adsData: any = await adsResponse.json();
-            allAds = [...allAds, ...adsData.data];
-            adsNextUrl = adsData.paging?.next || null;
-          } else {
-            const errorText = await adsResponse.text();
-            console.error(`[${logId}] Erro ao buscar ads:`, errorText.substring(0, 150));
-            adsNextUrl = null;
+          while (adsNextUrl && (Date.now() - startTime < MAX_EXECUTION_TIME)) {
+            const adsResponse: Response = await fetch(adsNextUrl);
+            if (adsResponse.ok) {
+              const adsData: any = await adsResponse.json();
+              allAds = [...allAds, ...adsData.data];
+              adsNextUrl = adsData.paging?.next || null;
+            } else {
+              adsNextUrl = null;
+            }
           }
-        }
 
-        console.log(`[${logId}] Conta ${account.name}: ${allAds.length} ads encontrados da API`);
-
-        // Batch upsert ads
-        if (allAds.length > 0) {
+          // Filtrar ads que pertencem a ad sets conhecidos
           const filteredAds = allAds.filter(ad => adSetIdMap.has(ad.adset_id));
-          console.log(`[${logId}] Ads filtrados: ${filteredAds.length}/${allAds.length} (match com ad_sets existentes)`);
-          
-          if (filteredAds.length === 0 && allAds.length > 0) {
-            console.warn(`[${logId}] AVISO: Nenhum ad correspondeu aos ad_sets. AdSet IDs no mapa: ${Array.from(adSetIdMap.keys()).slice(0, 5).join(', ')}...`);
-            console.warn(`[${logId}] Ad adset_ids: ${allAds.slice(0, 5).map(a => a.adset_id).join(', ')}...`);
-          }
-          
-          const adsBatch = filteredAds.map((ad: any) => ({
-              ad_set_id: adSetIdMap.get(ad.adset_id),
-              ad_id: ad.id,
-              name: ad.name,
-              status: ad.status,
-              creative_id: ad.creative?.id || null,
-              creative_name: ad.creative?.name || null,
-              creative_type: ad.creative?.object_type || null,
-              creative_url: ad.creative?.thumbnail_url || null,
-              ad_format: ad.creative?.object_type || null,
-            }));
+          console.log(`[${logId}] Conta ${account.name}: ${filteredAds.length}/${allAds.length} ads válidos`);
 
-          const insertedAds = await batchUpsert(supabaseClient, 'ads', adsBatch, 'ad_set_id,ad_id');
-          adsSynced += insertedAds;
+          // Upsert ads
+          for (const ad of filteredAds) {
+            const { error: adError } = await supabaseClient
+              .from('ads')
+              .upsert({
+                ad_set_id: adSetIdMap.get(ad.adset_id),
+                ad_id: ad.id,
+                name: ad.name,
+                status: ad.status,
+                creative_id: ad.creative?.id || null,
+                creative_name: ad.creative?.name || null,
+                creative_type: ad.creative?.object_type || null,
+                creative_url: ad.creative?.thumbnail_url || null,
+                ad_format: ad.creative?.object_type || null,
+              }, { onConflict: 'ad_set_id,ad_id' });
+
+            if (!adError) adsSynced++;
+          }
         }
 
         // Delay entre contas para evitar rate limit
@@ -308,6 +292,15 @@ serve(async (req) => {
       } catch (error) {
         console.error(`[${logId}] Erro ao sincronizar conta ${account.id}:`, error);
       }
+    }
+
+    // Marcar contas sem acesso como inativas
+    if (accountsWithoutAccess.length > 0) {
+      console.log(`[${logId}] Marcando ${accountsWithoutAccess.length} contas sem acesso como inativas`);
+      await supabaseClient
+        .from('ad_accounts')
+        .update({ is_active: false })
+        .in('account_id', accountsWithoutAccess);
     }
 
     await supabaseClient.from('sync_logs').update({
@@ -327,6 +320,7 @@ serve(async (req) => {
         campaignsSynced,
         adSetsSynced,
         adsSynced,
+        accountsWithoutAccess: accountsWithoutAccess.length,
         executionTime: `${executionTime}s`,
         message: `Campanhas Meta sincronizadas: ${campaignsSynced} campanhas, ${adSetsSynced} ad sets, ${adsSynced} ads`,
       }),

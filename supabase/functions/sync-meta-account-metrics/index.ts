@@ -173,7 +173,7 @@ async function processCampaign(
         });
       }
 
-      // Buscar breakdowns demográficos
+      // Buscar breakdowns demográficos em paralelo
       const demographicFields = 'date_start,impressions,clicks,spend,actions';
       
       const breakdownPromises = [
@@ -259,15 +259,16 @@ serve(async (req) => {
 
     console.log(`[${logId}] Sincronizando métricas para conta ${accountId}`);
 
-    // Verificar se a conta pertence ao usuário
+    // Verificar se a conta pertence ao usuário e está ativa
     const { data: account, error: accountError } = await supabaseClient
       .from('ad_accounts')
       .select(`
         id,
         account_id,
         account_name,
+        is_active,
         integration_id,
-        integrations!inner(id, user_id, provider, status, access_token, refresh_token)
+        integrations!inner(id, user_id, provider, status)
       `)
       .eq('id', accountId)
       .eq('integrations.user_id', user.id)
@@ -283,26 +284,60 @@ serve(async (req) => {
       );
     }
 
+    // Verificar se a conta está ativa
+    if (!account.is_active) {
+      console.log(`[${logId}] Conta ${account.account_name} está inativa, pulando sincronização`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Conta inativa',
+          message: 'Esta conta foi marcada como inativa. Reconecte sua integração Meta Ads.'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const integration = (account as any).integrations;
     const accessToken = await getValidAccessToken(supabaseClient, integration.id);
 
-    // Buscar campanhas desta conta
+    // Testar acesso à conta antes de prosseguir
+    const testUrl = `https://graph.facebook.com/v18.0/${account.account_id}?fields=id,name&access_token=${accessToken}`;
+    const testRes = await fetch(testUrl);
+    
+    if (!testRes.ok) {
+      const errorText = await testRes.text();
+      if (errorText.includes('"code":100') || errorText.includes('does not exist') || errorText.includes('OAuthException')) {
+        console.warn(`[${logId}] Sem acesso à conta ${account.account_name}, marcando como inativa`);
+        await supabaseClient.from('ad_accounts').update({ is_active: false }).eq('id', accountId);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Sem acesso à conta',
+            message: 'Você não tem mais acesso a esta conta de anúncios. A conta foi marcada como inativa.'
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Buscar apenas campanhas ativas com sync_enabled
     const { data: campaigns, error: campaignsError } = await supabaseClient
       .from('campaigns')
       .select('id, campaign_id, name, status')
       .eq('ad_account_id', accountId)
-      .eq('sync_enabled', true);
+      .eq('sync_enabled', true)
+      .in('status', ['ACTIVE', 'PAUSED']);
 
     if (campaignsError) {
       throw new Error('Erro ao buscar campanhas');
     }
 
     if (!campaigns || campaigns.length === 0) {
-      console.log(`[${logId}] Nenhuma campanha para sincronizar na conta ${account.account_name}`);
+      console.log(`[${logId}] Nenhuma campanha ativa para sincronizar na conta ${account.account_name}`);
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'Nenhuma campanha para sincronizar.',
+          message: 'Nenhuma campanha ativa para sincronizar.',
           account_name: account.account_name,
           metricsSynced: 0,
           breakdownsSynced: 0,
@@ -311,7 +346,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[${logId}] Sincronizando ${campaigns.length} campanhas da conta ${account.account_name}`);
+    console.log(`[${logId}] Sincronizando ${campaigns.length} campanhas ativas da conta ${account.account_name}`);
 
     // Mapear ads
     const campaignIds = campaigns.map((c: any) => c.id);
@@ -340,7 +375,7 @@ serve(async (req) => {
     const since = date30DaysAgo.toISOString().split('T')[0];
     const until = new Date().toISOString().split('T')[0];
 
-    // Processar campanhas em lotes de 3 (mais conservador para evitar rate limiting)
+    // Processar campanhas em lotes
     const BATCH_SIZE = 3;
     for (let i = 0; i < campaigns.length; i += BATCH_SIZE) {
       const batch = campaigns.slice(i, i + BATCH_SIZE);
@@ -395,6 +430,7 @@ serve(async (req) => {
         success: true,
         account_name: account.account_name,
         campaigns_processed: campaigns.length,
+        campaigns_disabled: campaignsToDisable.length,
         metricsSynced,
         breakdownsSynced,
         errors,
