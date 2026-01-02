@@ -21,7 +21,7 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({ data }) => {
     return (
         <div className="bg-dark-card border border-dark-border rounded-2xl p-6 overflow-hidden">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-gray-100 text-sm">Visão Geral</h2>
+                <h2 className="font-bold text-gray-100 text-sm">Top Campanhas</h2>
                 <div className="flex gap-2">
                     {/* Icons/Actions could go here */}
                 </div>
