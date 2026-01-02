@@ -2,9 +2,31 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+// Query keys que devem ser invalidadas após sincronização de conta Meta
+const ACCOUNT_QUERY_KEYS = [
+  'metrics',
+  'campaigns',
+  'ad-accounts',
+  'demographics',
+  'region-breakdown',
+  'top-creatives',
+  'funnel-metrics',
+  'timeline-metrics',
+  'daily-metrics',
+  'chart-data',
+  'platform-breakdown',
+  'last-sync',
+];
+
 export const useSyncAccountMetrics = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const invalidateAllQueries = () => {
+    ACCOUNT_QUERY_KEYS.forEach(key => {
+      queryClient.invalidateQueries({ queryKey: [key] });
+    });
+  };
 
   const syncAccountMutation = useMutation({
     mutationFn: async (accountId: string) => {
@@ -18,10 +40,7 @@ export const useSyncAccountMetrics = () => {
     },
     onSuccess: (data) => {
       // Invalidar todas as queries relevantes
-      queryClient.invalidateQueries({ queryKey: ['metrics'] });
-      queryClient.invalidateQueries({ queryKey: ['demographics'] });
-      queryClient.invalidateQueries({ queryKey: ['region-breakdown'] });
-      queryClient.invalidateQueries({ queryKey: ['top-creatives'] });
+      invalidateAllQueries();
       
       toast({
         title: 'Conta Sincronizada!',
